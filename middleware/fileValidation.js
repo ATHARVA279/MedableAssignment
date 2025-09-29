@@ -1,7 +1,6 @@
 const path = require('path');
 const crypto = require('crypto');
 
-// Allowed MIME types
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png', 

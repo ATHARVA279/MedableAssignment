@@ -11,7 +11,6 @@ const router = express.Router();
 
 const shareLinks = new Map();
 
-// Default expiration times
 const EXPIRATION_OPTIONS = {
   "1h": 60 * 60 * 1000,
   "24h": 24 * 60 * 60 * 1000,

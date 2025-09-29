@@ -498,7 +498,6 @@ router.post(
     } else if (file.mimetype.startsWith("image/")) {
       processingPriority = JOB_PRIORITIES.HIGH;
     } else if (file.size > 10 * 1024 * 1024) {
-      // Large files get lower priority
       processingPriority = JOB_PRIORITIES.LOW;
     }
 

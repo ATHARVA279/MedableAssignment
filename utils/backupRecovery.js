@@ -148,9 +148,6 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Create incremental backup (files changed since last backup)
-   */
   async createIncrementalBackup(lastBackupTimestamp, options = {}) {
     const backupId = crypto.randomUUID();
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -164,7 +161,6 @@ class BackupRecovery {
     });
 
     try {
-      // Get files modified since last backup
       const modifiedFiles = await this.getModifiedCloudinaryFiles(
         lastBackupTimestamp
       );
@@ -176,13 +172,11 @@ class BackupRecovery {
         return null;
       }
 
-      // Create backup archive
       const archive = archiver("zip", { zlib: { level: 9 } });
       const output = require("fs").createWriteStream(backupPath);
 
       archive.pipe(output);
 
-      // Add file metadata
       const metadata = {
         backupId,
         timestamp: new Date().toISOString(),
@@ -192,7 +186,6 @@ class BackupRecovery {
         files: [],
       };
 
-      // Process modified files
       let processedFiles = 0;
       for (const file of modifiedFiles) {
         try {
@@ -223,12 +216,10 @@ class BackupRecovery {
         }
       }
 
-      // Add metadata to archive
       archive.append(JSON.stringify(metadata, null, 2), {
         name: "metadata.json",
       });
 
-      // Finalize archive
       await new Promise((resolve, reject) => {
         output.on("close", resolve);
         output.on("error", reject);
@@ -236,14 +227,12 @@ class BackupRecovery {
         archive.finalize();
       });
 
-      // Calculate backup checksum
       const backupBuffer = await fs.readFile(backupPath);
       const checksum = crypto
         .createHash("sha256")
         .update(backupBuffer)
         .digest("hex");
 
-      // Update backup metadata
       await this.updateBackupMetadata({
         backupId,
         name: backupName,
@@ -282,20 +271,15 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Restore from backup
-   */
   async restoreFromBackup(backupId, options = {}) {
     logger.info("Starting restore from backup", { backupId });
 
     try {
-      // Get backup metadata
       const backupInfo = await this.getBackupInfo(backupId);
       if (!backupInfo) {
         throw new Error(`Backup not found: ${backupId}`);
       }
 
-      // Verify backup integrity
       const isValid = await this.verifyBackupIntegrity(
         backupInfo.path,
         backupInfo.checksum
@@ -304,15 +288,12 @@ class BackupRecovery {
         throw new Error("Backup file integrity check failed");
       }
 
-      // Extract backup
       const extractPath = path.join(this.backupDir, `restore-${backupId}`);
       await this.extractBackup(backupInfo.path, extractPath);
 
-      // Read metadata
       const metadataPath = path.join(extractPath, "metadata.json");
       const metadata = JSON.parse(await fs.readFile(metadataPath, "utf8"));
 
-      // Restore files to Cloudinary
       let restoredFiles = 0;
       const failedFiles = [];
 
@@ -321,7 +302,6 @@ class BackupRecovery {
           const filePath = path.join(extractPath, "files", fileInfo.publicId);
           const fileBuffer = await fs.readFile(filePath);
 
-          // Upload to Cloudinary with original public_id
           await this.restoreFileToCloudinary(fileBuffer, fileInfo);
           restoredFiles++;
 
@@ -340,7 +320,6 @@ class BackupRecovery {
         }
       }
 
-      // Clean up extraction directory
       await this.cleanupDirectory(extractPath);
 
       logger.info("Restore completed", {
@@ -362,10 +341,7 @@ class BackupRecovery {
       throw error;
     }
   }
-
-  /**
-   * Get all files from Cloudinary
-   */
+  
   async getAllCloudinaryFiles() {
     const allFiles = [];
     let nextCursor = null;

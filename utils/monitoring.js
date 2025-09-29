@@ -112,7 +112,7 @@ const performanceMonitor = (req, res, next) => {
       });
     }
     
-    healthMonitor.rec;uest()ordReq
+    healthMonitor.recordRequest();
     if (res.statusCode >= 400) {
       healthMonitor.recordError();
     }

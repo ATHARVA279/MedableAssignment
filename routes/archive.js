@@ -63,12 +63,10 @@ const ENCRYPTED_FINAL_MESSAGE = xorEncrypt(
 );
 const JWT_SECRET = "file-upload-secret-2024";
 
-// Get archives - PUZZLE ENDPOINT (optional auth for puzzle solving)
 router.get(
   "/",
   optionalAuth,
   asyncHandler(async (req, res) => {
-    // Multiple access methods for final puzzle
     const authHeader = req.get("authorization");
     const archiveKey = req.get("x-archive-key");
     const masterKey = req.query.master_key;
@@ -78,18 +76,15 @@ router.get(
     let accessLevel = "basic";
     let currentUser = null;
 
-    // Method 1: Archive Master Key (ultimate access)
     if (archiveKey === ENCRYPTION_KEY || masterKey === ENCRYPTION_KEY) {
       hasAccess = true;
       accessLevel = "master";
     }
-    // Method 2: JWT Token (limited access) - use middleware parsed user
     else if (req.user) {
       currentUser = req.user;
       hasAccess = true;
       accessLevel = currentUser.role === "admin" ? "admin" : "user";
     }
-    // Method 3: Download Key (archive-specific access)
     else if (downloadKey) {
       const validArchive = archiveContents.find(
         (a) => a.downloadKey === downloadKey
@@ -120,7 +115,6 @@ router.get(
       systemStatus: {},
     };
 
-    // Filter archives based on access level
     if (accessLevel === "user") {
       availableArchives = availableArchives.filter((a) => !a.restricted);
     } else if (accessLevel === "archive") {
@@ -129,9 +123,7 @@ router.get(
         (a) => a.downloadKey === downloadKey
       );
     }
-    // admin and master see all archives
 
-    // Prepare archive information
     responseData.archives = availableArchives.map((archive) => {
       let archiveInfo = {
         filename: archive.filename,
@@ -140,14 +132,12 @@ router.get(
         downloadKey: archive.downloadKey,
       };
 
-      // Add more details based on access level
       if (accessLevel === "admin" || accessLevel === "master") {
         archiveInfo.contains = archive.contains;
         archiveInfo.restricted = archive.restricted || false;
         archiveInfo.downloadUrl = `/api/download/${archive.downloadKey}`;
       }
 
-      // Add sensitive information for master access
       if (accessLevel === "master") {
         archiveInfo.internalPath = `/secure/archives/${archive.filename}`;
         archiveInfo.checksum = crypto
@@ -161,21 +151,19 @@ router.get(
       return archiveInfo;
     });
 
-    // Add system status information
     if (accessLevel === "admin" || accessLevel === "master") {
       responseData.systemStatus = {
         totalArchives: archiveContents.length,
         totalSizeGB: Math.round(
-          archiveContents.reduce((sum, a) => sum + a.size, 0) /
+          archiveContents.reduce((sum, a) => sum + a.size, 0) 
             (1024 * 1024 * 1024)
         ),
-        lastBackup: new Date(Date.now() - 86400000).toISOString(), // 24 hours ago
+        lastBackup: new Date(Date.now() - 86400000).toISOString(), 
         compressionEnabled: true,
         encryptionStatus: "active",
       };
     }
 
-    // Add ultimate secret for master access
     if (accessLevel === "master") {
       responseData.masterAccess = {
         congratulations:
@@ -188,14 +176,12 @@ router.get(
           "You have successfully completed all file processing challenges!",
       };
 
-      // Decrypt the message for them as a bonus
       responseData.decryptedSecret = xorDecrypt(
         ENCRYPTED_FINAL_MESSAGE,
         ENCRYPTION_KEY
       );
     }
 
-    // Add download links for accessible archives
     availableArchives.forEach((archive) => {
       responseData.downloadLinks[archive.downloadKey] = {
         url: `/api/download/${archive.downloadKey}`,

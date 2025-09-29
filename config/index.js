@@ -180,6 +180,7 @@ if (config.server.isProduction) {
     process.exit(1);
   }
 
+  if (config.security.jwtSecret === "file-upload-secret-2024") 
   if (config.security.jwtSecret === "file-upload-secret-2024") {
     console.warn("WARNING: Using default JWT secret in production!");
   }
