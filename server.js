@@ -201,36 +201,27 @@ if (config.development.enableTestEndpoints) {
 }
 
 app.get("/", (req, res) => {
-  try {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  } catch (error) {
-    res.json({
-      message: "File Processing API - Assessment 4",
-      status: "running",
-      environment: config.server.env,
-      endpoints: {
-        health: "/health",
-        upload: "/api/upload",
-        processingLogs: "/api/processing-logs",
-        archive: "/api/archive",
-      },
-    });
-  }
+  res.json({
+    message: "File Processing API - Assessment 4",
+    status: "running",
+    environment: config.server.env,
+    endpoints: {
+      health: "/health",
+      upload: "/api/upload",
+      processingLogs: "/api/processing-logs",
+      archive: "/api/archive",
+    },
+  });
 });
 
 app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api/")) {
-    return next();
-  }
-  try {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  } catch (error) {
-    res.status(404).json({
-      error: "Page not found",
-      message:
-        "This is a File Processing API. Use /api endpoints or /health for status.",
-    });
-  }
+  if (req.path.startsWith("/api/")) return next();
+
+  res.status(404).json({
+    error: "Page not found",
+    message:
+      "This is a File Processing API. Use /api endpoints or /health for status.",
+  });
 });
 
 app.use("*", (req, res) => {
