@@ -1,26 +1,20 @@
 const { logger } = require('./logger');
 const { EventEmitter } = require('events');
 
-/**
- * Network Timeout and Upload Resumption Handler
- */
 class NetworkTimeoutHandler extends EventEmitter {
   constructor() {
     super();
     this.activeUploads = new Map();
     this.uploadChunks = new Map();
     this.timeoutSettings = {
-      connectionTimeout: 30000, // 30 seconds
-      uploadTimeout: 300000,    // 5 minutes
-      chunkTimeout: 60000,      // 1 minute per chunk
+      connectionTimeout: 30000, 
+      uploadTimeout: 300000,  
+      chunkTimeout: 60000,     
       maxRetries: 3,
-      retryDelay: 2000         // 2 seconds
+      retryDelay: 2000        
     };
   }
 
-  /**
-   * Create resumable upload session
-   */
   createUploadSession(fileId, fileSize, fileName, userId) {
     const sessionId = `upload_${fileId}_${Date.now()}`;
     const chunkSize = this.calculateOptimalChunkSize(fileSize);
@@ -58,25 +52,18 @@ class NetworkTimeoutHandler extends EventEmitter {
     return session;
   }
 
-  /**
-   * Calculate optimal chunk size based on file size
-   */
   calculateOptimalChunkSize(fileSize) {
-    // Adaptive chunk sizing
-    if (fileSize < 1024 * 1024) {        // < 1MB
-      return 256 * 1024;                  // 256KB chunks
-    } else if (fileSize < 10 * 1024 * 1024) { // < 10MB
-      return 512 * 1024;                  // 512KB chunks
-    } else if (fileSize < 100 * 1024 * 1024) { // < 100MB
-      return 1024 * 1024;                 // 1MB chunks
+    if (fileSize < 1024 * 1024) {       
+      return 256 * 1024;                 
+    } else if (fileSize < 10 * 1024 * 1024) { 
+      return 512 * 1024;                 
+    } else if (fileSize < 100 * 1024 * 1024) { 
+      return 1024 * 1024;               
     } else {
-      return 2 * 1024 * 1024;             // 2MB chunks for large files
+      return 2 * 1024 * 1024;            
     }
   }
 
-  /**
-   * Handle chunk upload with timeout protection
-   */
   async uploadChunkWithTimeout(sessionId, chunkIndex, chunkData, uploadFunction) {
     const session = this.activeUploads.get(sessionId);
     if (!session) {
@@ -88,22 +75,18 @@ class NetworkTimeoutHandler extends EventEmitter {
 
     while (retryCount <= this.timeoutSettings.maxRetries) {
       try {
-        // Update session activity
         session.lastActivity = Date.now();
         session.status = 'uploading';
 
-        // Create timeout promise
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => {
             reject(new Error(`Chunk upload timeout after ${this.timeoutSettings.chunkTimeout}ms`));
           }, this.timeoutSettings.chunkTimeout);
         });
 
-        // Race between upload and timeout
         const uploadPromise = uploadFunction(chunkData, chunkIndex, session);
         const result = await Promise.race([uploadPromise, timeoutPromise]);
 
-        // Store chunk data for potential retry
         this.uploadChunks.get(sessionId).set(chunkIndex, {
           data: chunkData,
           uploadedAt: Date.now(),
@@ -111,7 +94,6 @@ class NetworkTimeoutHandler extends EventEmitter {
           checksum: this.calculateChecksum(chunkData)
         });
 
-        // Mark chunk as uploaded
         session.uploadedChunks.add(chunkIndex);
         session.failedChunks.delete(chunkIndex);
 
@@ -143,7 +125,6 @@ class NetworkTimeoutHandler extends EventEmitter {
         });
 
         if (retryCount <= this.timeoutSettings.maxRetries) {
-          // Wait before retry with exponential backoff
           const delay = this.timeoutSettings.retryDelay * Math.pow(2, retryCount - 1);
           await new Promise(resolve => setTimeout(resolve, delay));
           
@@ -154,7 +135,6 @@ class NetworkTimeoutHandler extends EventEmitter {
             delay
           });
         } else {
-          // Max retries exceeded
           session.status = 'failed';
           this.emit('chunkFailed', {
             sessionId,
@@ -167,9 +147,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     }
   }
 
-  /**
-   * Resume failed upload
-   */
   async resumeUpload(sessionId, uploadFunction) {
     const session = this.activeUploads.get(sessionId);
     if (!session) {
@@ -186,7 +163,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     session.status = 'resuming';
     session.retryCount++;
 
-    // Get chunks that need to be uploaded
     const pendingChunks = [];
     for (let i = 0; i < session.totalChunks; i++) {
       if (!session.uploadedChunks.has(i)) {
@@ -194,7 +170,6 @@ class NetworkTimeoutHandler extends EventEmitter {
       }
     }
 
-    // Upload pending chunks
     for (const chunkIndex of pendingChunks) {
       const chunkData = await this.getChunkData(sessionId, chunkIndex);
       if (chunkData) {
@@ -202,7 +177,6 @@ class NetworkTimeoutHandler extends EventEmitter {
       }
     }
 
-    // Check if upload is complete
     if (session.uploadedChunks.size === session.totalChunks) {
       session.status = 'completed';
       session.completedAt = Date.now();
@@ -223,9 +197,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     return session;
   }
 
-  /**
-   * Get chunk data for resumption
-   */
   async getChunkData(sessionId, chunkIndex) {
     const chunks = this.uploadChunks.get(sessionId);
     if (chunks && chunks.has(chunkIndex)) {
@@ -234,17 +205,11 @@ class NetworkTimeoutHandler extends EventEmitter {
     return null;
   }
 
-  /**
-   * Calculate chunk checksum for integrity verification
-   */
   calculateChecksum(data) {
     const crypto = require('crypto');
     return crypto.createHash('md5').update(data).digest('hex');
   }
 
-  /**
-   * Verify upload integrity
-   */
   async verifyUploadIntegrity(sessionId) {
     const session = this.activeUploads.get(sessionId);
     if (!session) {
@@ -256,7 +221,6 @@ class NetworkTimeoutHandler extends EventEmitter {
       return false;
     }
 
-    // Verify all chunks are present
     for (let i = 0; i < session.totalChunks; i++) {
       if (!chunks.has(i)) {
         logger.warn('Missing chunk detected', { sessionId, chunkIndex: i });
@@ -264,7 +228,6 @@ class NetworkTimeoutHandler extends EventEmitter {
       }
     }
 
-    // Verify chunk checksums
     for (const [chunkIndex, chunkInfo] of chunks.entries()) {
       const currentChecksum = this.calculateChecksum(chunkInfo.data);
       if (currentChecksum !== chunkInfo.checksum) {
@@ -282,9 +245,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     return true;
   }
 
-  /**
-   * Combine uploaded chunks into final file
-   */
   async combineChunks(sessionId) {
     const session = this.activeUploads.get(sessionId);
     if (!session) {
@@ -296,13 +256,11 @@ class NetworkTimeoutHandler extends EventEmitter {
       throw new Error(`No chunks found for session: ${sessionId}`);
     }
 
-    // Verify integrity before combining
     const isValid = await this.verifyUploadIntegrity(sessionId);
     if (!isValid) {
       throw new Error('Upload integrity check failed');
     }
 
-    // Combine chunks in order
     const combinedChunks = [];
     for (let i = 0; i < session.totalChunks; i++) {
       const chunkInfo = chunks.get(i);
@@ -314,7 +272,6 @@ class NetworkTimeoutHandler extends EventEmitter {
 
     const combinedBuffer = Buffer.concat(combinedChunks);
 
-    // Verify final file size
     if (combinedBuffer.length !== session.fileSize) {
       throw new Error(`File size mismatch: expected ${session.fileSize}, got ${combinedBuffer.length}`);
     }
@@ -328,9 +285,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     return combinedBuffer;
   }
 
-  /**
-   * Clean up upload session
-   */
   cleanupSession(sessionId) {
     const session = this.activeUploads.get(sessionId);
     if (session) {
@@ -345,9 +299,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     }
   }
 
-  /**
-   * Get upload progress
-   */
   getUploadProgress(sessionId) {
     const session = this.activeUploads.get(sessionId);
     if (!session) {
@@ -369,9 +320,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     };
   }
 
-  /**
-   * List active upload sessions
-   */
   getActiveSessions(userId = null) {
     const sessions = [];
     
@@ -384,9 +332,6 @@ class NetworkTimeoutHandler extends EventEmitter {
     return sessions;
   }
 
-  /**
-   * Cancel upload session
-   */
   cancelUpload(sessionId) {
     const session = this.activeUploads.get(sessionId);
     if (session) {
@@ -397,16 +342,13 @@ class NetworkTimeoutHandler extends EventEmitter {
       
       logger.info('Upload session cancelled', { sessionId });
       
-      // Clean up after a delay to allow for any pending operations
       setTimeout(() => {
         this.cleanupSession(sessionId);
       }, 5000);
     }
   }
 
-  /**
-   * Clean up stale sessions
-   */
+
   cleanupStaleSessions() {
     const now = Date.now();
     const staleTimeout = 24 * 60 * 60 * 1000; // 24 hours
@@ -424,26 +366,18 @@ class NetworkTimeoutHandler extends EventEmitter {
     }
   }
 
-  /**
-   * Get timeout settings
-   */
   getTimeoutSettings() {
     return { ...this.timeoutSettings };
   }
 
-  /**
-   * Update timeout settings
-   */
   updateTimeoutSettings(newSettings) {
     this.timeoutSettings = { ...this.timeoutSettings, ...newSettings };
     logger.info('Timeout settings updated', this.timeoutSettings);
   }
 }
 
-// Global network timeout handler instance
 const networkTimeoutHandler = new NetworkTimeoutHandler();
 
-// Clean up stale sessions every hour
 setInterval(() => {
   networkTimeoutHandler.cleanupStaleSessions();
 }, 60 * 60 * 1000);

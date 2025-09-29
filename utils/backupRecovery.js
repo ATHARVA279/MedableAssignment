@@ -360,12 +360,7 @@ class BackupRecovery {
     return allFiles;
   }
 
-  /**
-   * Get files modified since timestamp
-   */
   async getModifiedCloudinaryFiles(since) {
-    // Cloudinary doesn't have direct "modified since" query
-    // We'll get all files and filter by created_at
     const allFiles = await this.getAllCloudinaryFiles();
     const sinceDate = new Date(since);
 
@@ -375,9 +370,6 @@ class BackupRecovery {
     });
   }
 
-  /**
-   * Download file from Cloudinary
-   */
   async downloadCloudinaryFile(file) {
     const response = await fetch(file.secure_url);
     if (!response.ok) {
@@ -386,9 +378,6 @@ class BackupRecovery {
     return Buffer.from(await response.arrayBuffer());
   }
 
-  /**
-   * Restore file to Cloudinary
-   */
   async restoreFileToCloudinary(fileBuffer, fileInfo) {
     return new Promise((resolve, reject) => {
       cloudinary.uploader
@@ -410,9 +399,6 @@ class BackupRecovery {
     });
   }
 
-  /**
-   * Update backup metadata
-   */
   async updateBackupMetadata(backupInfo) {
     try {
       let metadata = [];
@@ -421,7 +407,6 @@ class BackupRecovery {
         const existingData = await fs.readFile(this.metadataFile, "utf8");
         metadata = JSON.parse(existingData);
       } catch (error) {
-        // File doesn't exist yet, start with empty array
       }
 
       metadata.push(backupInfo);
@@ -433,9 +418,6 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Get backup information
-   */
   async getBackupInfo(backupId) {
     try {
       const data = await fs.readFile(this.metadataFile, "utf8");
@@ -446,9 +428,6 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * List all backups
-   */
   async listBackups() {
     try {
       const data = await fs.readFile(this.metadataFile, "utf8");
@@ -458,9 +437,6 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Verify backup integrity
-   */
   async verifyBackupIntegrity(backupPath, expectedChecksum) {
     try {
       const backupBuffer = await fs.readFile(backupPath);
@@ -474,9 +450,6 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Extract backup archive
-   */
   async extractBackup(backupPath, extractPath) {
     const yauzl = require("yauzl");
 
@@ -487,12 +460,10 @@ class BackupRecovery {
         zipfile.readEntry();
         zipfile.on("entry", async (entry) => {
           if (/\/$/.test(entry.fileName)) {
-            // Directory entry
             const dirPath = path.join(extractPath, entry.fileName);
             await fs.mkdir(dirPath, { recursive: true });
             zipfile.readEntry();
           } else {
-            // File entry
             zipfile.openReadStream(entry, async (err, readStream) => {
               if (err) return reject(err);
 
@@ -515,9 +486,6 @@ class BackupRecovery {
     });
   }
 
-  /**
-   * Clean up directory
-   */
   async cleanupDirectory(dirPath) {
     try {
       await fs.rm(dirPath, { recursive: true, force: true });
@@ -529,16 +497,12 @@ class BackupRecovery {
     }
   }
 
-  /**
-   * Schedule automatic backups
-   */
   scheduleAutomaticBackups(options = {}) {
     const fullBackupInterval =
       options.fullBackupInterval || 7 * 24 * 60 * 60 * 1000; // 7 days
     const incrementalInterval =
       options.incrementalInterval || 24 * 60 * 60 * 1000; // 1 day
 
-    // Schedule full backups
     setInterval(async () => {
       try {
         logger.info("Starting scheduled full backup");
@@ -549,7 +513,6 @@ class BackupRecovery {
       }
     }, fullBackupInterval);
 
-    // Schedule incremental backups
     setInterval(async () => {
       try {
         const backups = await this.listBackups();
@@ -581,9 +544,6 @@ class BackupRecovery {
     });
   }
 
-  /**
-   * Clean up old backups
-   */
   async cleanupOldBackups(retentionDays = 30) {
     try {
       const backups = await this.listBackups();
@@ -610,7 +570,6 @@ class BackupRecovery {
         }
       }
 
-      // Update metadata to remove deleted backups
       const remainingBackups = backups.filter(
         (backup) => new Date(backup.timestamp) >= cutoffDate
       );
@@ -629,7 +588,6 @@ class BackupRecovery {
   }
 }
 
-// Global backup recovery instance
 const backupRecovery = new BackupRecovery();
 
 module.exports = {

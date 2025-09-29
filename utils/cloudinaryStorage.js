@@ -5,7 +5,6 @@ const { retryOperations } = require('./retryManager');
 const { RetryableError, PermanentError } = require('../middleware/errorHandler');
 const { FileCompressor } = require('./fileCompression');
 
-// Configure Cloudinary
 cloudinary.config({
   cloud_name: config.storage.cloudinary.cloudName,
   api_key: config.storage.cloudinary.apiKey,
@@ -13,9 +12,6 @@ cloudinary.config({
   secure: config.storage.cloudinary.secure
 });
 
-/**
- * Upload file buffer to Cloudinary with retry logic and compression
- */
 async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = {}) {
   const context = {
     operationName: 'Cloudinary Upload',
@@ -25,7 +21,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
   };
 
   return retryOperations.fileUpload(async () => {
-    // Validate inputs
     if (!fileBuffer || !Buffer.isBuffer(fileBuffer)) {
       throw new PermanentError('Invalid file buffer provided');
     }
@@ -42,7 +37,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
       throw new PermanentError('Invalid MIME type provided');
     }
 
-    // Apply compression if enabled and supported
     let uploadBuffer = fileBuffer;
     let uploadMimetype = mimetype;
     let compressionInfo = null;
@@ -78,21 +72,18 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
           originalName,
           error: compressionError.message
         });
-        // Continue with original buffer if compression fails
       }
     }
 
-    // Determine resource type based on MIME type
     let resourceType = 'auto';
     if (mimetype.startsWith('image/')) {
       resourceType = 'image';
     } else if (mimetype.startsWith('video/')) {
       resourceType = 'video';
     } else {
-      resourceType = 'raw'; // For PDFs, CSVs, etc.
+      resourceType = 'raw';
     }
 
-    // Generate a unique public_id
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
     const fileExtension = originalName.split('.').pop();
@@ -108,7 +99,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
       ...options
     };
 
-    // For images, add transformation options but remove problematic ones
     if (resourceType === 'image') {
       uploadOptions.transformation = [
         { quality: 'auto' }
@@ -124,7 +114,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
       compressed: !!compressionInfo
     });
 
-    // Upload to Cloudinary with improved error handling
     const result = await new Promise((resolve, reject) => {
       try {
         const uploadStream = cloudinary.uploader.upload_stream(
@@ -141,7 +130,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
                 bufferSize: uploadBuffer.length
               });
 
-              // Categorize errors for retry logic
               if (error.http_code >= 500 || error.message.includes('timeout') || 
                   error.message.includes('network') || error.message.includes('connection')) {
                 reject(new RetryableError(`Cloudinary upload failed: ${error.message}`));
@@ -171,7 +159,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
           }
         );
         
-        // Handle stream errors
         uploadStream.on('error', (streamError) => {
           logger.error('Cloudinary upload stream error', {
             error: streamError.message,
@@ -181,7 +168,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
           reject(new RetryableError(`Upload stream failed: ${streamError.message}`));
         });
         
-        // End the stream with the buffer
         uploadStream.end(uploadBuffer);
         
       } catch (promiseError) {
@@ -215,22 +201,18 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
       mimetype: uploadMimetype,
       originalMimetype: mimetype,
       createdAt: result.created_at,
-      buffer: uploadBuffer // Include buffer for further processing
+      buffer: uploadBuffer 
     };
 
-    // Add compression information if compression was applied
     if (compressionInfo) {
       uploadResult.compression = compressionInfo;
     }
 
     return uploadResult;
 
-  }, context); // Close the retry operation
+  }, context);
 }
 
-/**
- * Delete file from Cloudinary
- */
 async function deleteFromCloudinary(publicId, resourceType = 'auto') {
   try {
     const result = await cloudinary.uploader.destroy(publicId, {
@@ -252,9 +234,6 @@ async function deleteFromCloudinary(publicId, resourceType = 'auto') {
   }
 }
 
-/**
- * Generate thumbnail URL for images
- */
 function generateThumbnailUrl(publicId, options = {}) {
   const defaultOptions = {
     width: 200,
@@ -272,9 +251,6 @@ function generateThumbnailUrl(publicId, options = {}) {
   });
 }
 
-/**
- * Generate optimized URL for any file type
- */
 function generateOptimizedUrl(publicId, resourceType = 'auto', options = {}) {
   const baseOptions = {
     secure: true,
@@ -292,9 +268,6 @@ function generateOptimizedUrl(publicId, resourceType = 'auto', options = {}) {
   });
 }
 
-/**
- * Generate download URL for files (especially PDFs and raw files)
- */
 function generateDownloadUrl(publicId, resourceType = 'raw', filename = null) {
   const options = {
     resource_type: resourceType,
@@ -302,9 +275,7 @@ function generateDownloadUrl(publicId, resourceType = 'raw', filename = null) {
     secure: true
   };
 
-  // Add filename if provided
   if (filename) {
-    // Extract just the filename without path
     const cleanFilename = filename.split('/').pop();
     options.public_id = `${publicId}/${cleanFilename}`;
   }
@@ -312,9 +283,6 @@ function generateDownloadUrl(publicId, resourceType = 'raw', filename = null) {
   return cloudinary.url(publicId, options);
 }
 
-/**
- * Extract public ID from Cloudinary URL
- */
 function extractPublicIdFromUrl(cloudinaryUrl) {
   try {
     const urlParts = cloudinaryUrl.split('/');
@@ -324,15 +292,12 @@ function extractPublicIdFromUrl(cloudinaryUrl) {
       throw new Error('Invalid Cloudinary URL format');
     }
     
-    // Get everything after 'upload' and version (if present)
     let pathParts = urlParts.slice(uploadIndex + 1);
     
-    // Remove version if present (starts with 'v' followed by numbers)
     if (pathParts[0] && pathParts[0].match(/^v\d+$/)) {
       pathParts = pathParts.slice(1);
     }
     
-    // Join the remaining parts and remove file extension
     const publicIdWithExtension = pathParts.join('/');
     const publicId = publicIdWithExtension.replace(/\.[^/.]+$/, '');
     
@@ -346,9 +311,6 @@ function extractPublicIdFromUrl(cloudinaryUrl) {
   }
 }
 
-/**
- * Get file metadata from Cloudinary
- */
 async function getFileMetadata(publicId, resourceType = 'auto') {
   try {
     const result = await cloudinary.api.resource(publicId, {
@@ -374,9 +336,6 @@ async function getFileMetadata(publicId, resourceType = 'auto') {
   }
 }
 
-/**
- * Check if Cloudinary is properly configured
- */
 function isCloudinaryConfigured() {
   return !!(
     config.storage.cloudinary.cloudName &&
@@ -385,58 +344,18 @@ function isCloudinaryConfigured() {
   );
 }
 
-/**
- * Test Cloudinary connection
- */
 async function testCloudinaryConnection() {
   try {
     if (!isCloudinaryConfigured()) {
       throw new Error('Cloudinary credentials not configured');
     }
 
-    // Test by getting account details
     const result = await cloudinary.api.ping();
     
     logger.info('Cloudinary connection test successful', { status: result.status });
     return { success: true, status: result.status };
   } catch (error) {
     logger.error('Cloudinary connection test failed', { error: error.message });
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Test a simple upload to verify configuration
- */
-async function testCloudinaryUpload() {
-  try {
-    if (!isCloudinaryConfigured()) {
-      throw new Error('Cloudinary credentials not configured');
-    }
-
-    // Create a simple test buffer (1x1 white pixel PNG)
-    const testBuffer = Buffer.from([
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-      0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE, 0x00, 0x00, 0x00,
-      0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8, 0x0F, 0x00, 0x00,
-      0x01, 0x00, 0x01, 0x5C, 0xC2, 0x8A, 0x83, 0x00, 0x00, 0x00, 0x00, 0x49,
-      0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
-    ]);
-
-    const result = await uploadToCloudinary(testBuffer, 'test-connection.png', 'image/png');
-    
-    // Clean up test image
-    try {
-      await deleteFromCloudinary(result.publicId, 'image');
-    } catch (cleanupError) {
-      logger.warn('Failed to cleanup test image', { publicId: result.publicId });
-    }
-    
-    logger.info('Cloudinary upload test successful');
-    return { success: true, message: 'Upload test passed' };
-  } catch (error) {
-    logger.error('Cloudinary upload test failed', { error: error.message });
     return { success: false, error: error.message };
   }
 }

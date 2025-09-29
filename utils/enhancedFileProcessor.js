@@ -1,4 +1,3 @@
-// Enhanced file processor with retry logic and queue integration
 const axios = require('axios');
 const sharp = require('sharp');
 const csvParser = require('csv-parser');
@@ -14,12 +13,9 @@ const { RetryableError, PermanentError } = require('../middleware/errorHandler')
 const { FileCompressor } = require('./fileCompression');
 const { queueManager, JOB_TYPES, JOB_PRIORITIES } = require('./jobQueue');
 
-const DEFAULT_MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024; // 50 MB
-const STREAM_CSV_ROW_PROGRESS_INTERVAL = 1000; // update progress every N rows
+const DEFAULT_MAX_DOWNLOAD_BYTES = 50 * 1024 * 1024; 
+const STREAM_CSV_ROW_PROGRESS_INTERVAL = 1000;
 
-/**
- * Enhanced processing tracker with retry support
- */
 class EnhancedProcessingTracker {
   constructor() {
     this.jobs = new Map();
@@ -28,7 +24,6 @@ class EnhancedProcessingTracker {
       maxJobs: 500
     });
     
-    // Register processors
     this.registerProcessors();
   }
 
@@ -42,15 +37,12 @@ class EnhancedProcessingTracker {
     const { fileData, cloudinaryResult, compressionEnabled = true } = data;
     
     try {
-      // Update progress
       job.updateStatus('processing', { progress: 10 });
       
-      // Process the file
       const processingResult = await this.processFileWithRetry(fileData, cloudinaryResult);
       
       job.updateStatus('processing', { progress: 70 });
       
-      // Apply compression if enabled
       if (compressionEnabled && FileCompressor.isCompressionSupported(fileData.mimetype)) {
         const compressionResult = await this.compressFileWithRetry(
           cloudinaryResult.buffer || await this.fetchBuffer(cloudinaryResult.secureUrl),
@@ -63,7 +55,6 @@ class EnhancedProcessingTracker {
       
       job.updateStatus('processing', { progress: 90 });
       
-      // Generate thumbnail if it's an image
       if (fileData.mimetype.startsWith('image/')) {
         try {
           const thumbnailResult = await this.generateThumbnailWithRetry(
@@ -645,7 +636,6 @@ class EnhancedProcessingTracker {
   getJob(fileId) {
     const job = this.jobs.get(fileId);
     if (job) {
-      // Get updated status from queue
       const queueJob = this.queue.getJob(job.jobId);
       if (queueJob) {
         job.status = queueJob.status;
@@ -696,17 +686,13 @@ class EnhancedProcessingTracker {
   }
 }
 
-// Create enhanced processing tracker instance
 const enhancedProcessingTracker = new EnhancedProcessingTracker();
 
-// Backward compatibility functions for existing code
 async function processFile(fileData, cloudinaryResult) {
   const fileId = fileData.id || cloudinaryResult.publicId || 'temp-' + Date.now();
   
-  // Start enhanced processing job
   const jobId = await enhancedProcessingTracker.startJob(fileId, fileData, cloudinaryResult);
   
-  // For backward compatibility, we'll wait for the job to complete
   return new Promise((resolve, reject) => {
     const checkJob = () => {
       const job = enhancedProcessingTracker.getJob(fileId);
@@ -720,7 +706,6 @@ async function processFile(fileData, cloudinaryResult) {
       } else if (job.status === 'failed') {
         reject(new Error(job.error?.message || 'Processing failed'));
       } else {
-        // Still processing, check again
         setTimeout(checkJob, 1000);
       }
     };
@@ -729,15 +714,13 @@ async function processFile(fileData, cloudinaryResult) {
   });
 }
 
-// Periodic cleanup
 setInterval(() => {
   enhancedProcessingTracker.cleanupOldJobs();
-}, 60 * 60 * 1000); // every hour
+}, 60 * 60 * 1000); 
 
 module.exports = {
   processFile,
   EnhancedProcessingTracker,
   enhancedProcessingTracker,
-  // Export legacy tracker for backward compatibility
   processingTracker: enhancedProcessingTracker
 };

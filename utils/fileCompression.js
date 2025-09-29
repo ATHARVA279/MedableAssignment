@@ -8,13 +8,6 @@ const { logger } = require('./logger');
 const { retryOperations } = require('./retryManager');
 const { AppError, RetryableError, PermanentError } = require('../middleware/errorHandler');
 
-/**
- * Comprehensive file compression utility
- * Supports images, PDFs, CSVs with optimal compression strategies
- * Compatible with Cloudinary storage and versioning
- */
-
-// Compression configuration
 const COMPRESSION_CONFIG = {
   image: {
     jpeg: {
@@ -34,36 +27,26 @@ const COMPRESSION_CONFIG = {
       effort: 6,
       smartSubsample: true
     },
-    // Size thresholds for compression
-    minSizeForCompression: 50 * 1024, // 50KB - don't compress smaller files
-    maxQualityReduction: 0.3, // Don't reduce quality by more than 30%
-    targetCompressionRatio: 0.7 // Aim for 30% size reduction
+    minSizeForCompression: 50 * 1024, 
+    maxQualityReduction: 0.3, 
+    targetCompressionRatio: 0.7 
   },
   pdf: {
-    // PDF compression through archive
     compressionLevel: 6,
     enableZip64: false
   },
   csv: {
-    // CSV compression through gzip
     compressionLevel: 6,
     windowBits: 15,
     memLevel: 8
   },
   general: {
-    // General file compression
     compressionLevel: 6,
-    chunkSize: 64 * 1024 // 64KB chunks
+    chunkSize: 64 * 1024 
   }
 };
 
-/**
- * Image compression utility
- */
 class ImageCompressor {
-  /**
-   * Compress image buffer with format-specific optimizations
-   */
   static async compressImage(buffer, mimetype, options = {}) {
     if (!Buffer.isBuffer(buffer)) {
       throw new PermanentError('Invalid buffer provided for image compression');
@@ -72,7 +55,6 @@ class ImageCompressor {
     const originalSize = buffer.length;
     const config = { ...COMPRESSION_CONFIG.image, ...options };
 
-    // Skip compression for small files
     if (originalSize < config.minSizeForCompression) {
       logger.debug('Skipping compression for small image', { 
         originalSize, 
@@ -91,10 +73,9 @@ class ImageCompressor {
     try {
       let sharpInstance = sharp(buffer, {
         failOnError: false,
-        limitInputPixels: 268402689 // ~16384x16384 max resolution
+        limitInputPixels: 268402689
       });
 
-      // Get image metadata
       const metadata = await sharpInstance.metadata();
       logger.debug('Image compression started', {
         format: metadata.format,
@@ -107,7 +88,6 @@ class ImageCompressor {
       let compressedBuffer;
       let outputFormat = metadata.format;
 
-      // Apply format-specific compression
       switch (mimetype) {
         case 'image/jpeg':
           compressedBuffer = await sharpInstance
@@ -145,7 +125,6 @@ class ImageCompressor {
           break;
 
         case 'image/gif':
-          // Convert GIF to PNG for better compression
           compressedBuffer = await sharpInstance
             .png({
               quality: config.png.quality,
@@ -162,7 +141,6 @@ class ImageCompressor {
       const compressedSize = compressedBuffer.length;
       const compressionRatio = compressedSize / originalSize;
 
-      // Check if compression was effective
       if (compressionRatio > (1 - config.maxQualityReduction)) {
         logger.debug('Compression not effective, using original', {
           originalSize,
@@ -207,7 +185,6 @@ class ImageCompressor {
         mimetype
       });
 
-      // If compression fails, return original
       if (error.message.includes('Input buffer contains unsupported image format')) {
         throw new PermanentError(`Unsupported or corrupted image format: ${mimetype}`);
       }
@@ -216,9 +193,6 @@ class ImageCompressor {
     }
   }
 
-  /**
-   * Generate compressed thumbnail
-   */
   static async generateThumbnail(buffer, mimetype, options = {}) {
     const { width = 300, height = 300, quality = 80 } = options;
 
@@ -251,13 +225,7 @@ class ImageCompressor {
   }
 }
 
-/**
- * Archive-based compression for PDFs and other files
- */
 class ArchiveCompressor {
-  /**
-   * Compress PDF or other files using ZIP compression
-   */
   static async compressFile(buffer, filename, mimetype, options = {}) {
     if (!Buffer.isBuffer(buffer)) {
       throw new PermanentError('Invalid buffer provided for file compression');
@@ -281,7 +249,6 @@ class ArchiveCompressor {
           const compressedSize = compressedBuffer.length;
           const compressionRatio = compressedSize / originalSize;
 
-          // Check if compression was effective (at least 5% reduction)
           if (compressionRatio > 0.95) {
             logger.debug('File compression not effective, using original', {
               filename,
@@ -347,13 +314,7 @@ class ArchiveCompressor {
   }
 }
 
-/**
- * CSV compression utility
- */
 class CsvCompressor {
-  /**
-   * Compress CSV data with optimizations
-   */
   static async compressCsv(buffer, options = {}) {
     if (!Buffer.isBuffer(buffer)) {
       throw new PermanentError('Invalid buffer provided for CSV compression');
@@ -363,7 +324,6 @@ class CsvCompressor {
     const config = { ...COMPRESSION_CONFIG.csv, ...options };
 
     try {
-      // Use gzip compression for CSV
       const zlib = require('zlib');
       const compressedBuffer = await promisify(zlib.gzip)(buffer, {
         level: config.compressionLevel,
@@ -374,7 +334,6 @@ class CsvCompressor {
       const compressedSize = compressedBuffer.length;
       const compressionRatio = compressedSize / originalSize;
 
-      // CSV files typically compress very well
       if (compressionRatio > 0.8) {
         logger.debug('CSV compression not effective, using original', {
           originalSize,
@@ -420,13 +379,7 @@ class CsvCompressor {
   }
 }
 
-/**
- * Main compression orchestrator
- */
 class FileCompressor {
-  /**
-   * Compress file based on its type with retry logic
-   */
   static async compressFile(buffer, filename, mimetype, options = {}) {
     const context = {
       operationName: 'File Compression',
@@ -447,11 +400,9 @@ class FileCompressor {
       } else if (mimetype === 'application/pdf') {
         result = await ArchiveCompressor.compressFile(buffer, filename, mimetype, options);
       } else {
-        // For other file types, use archive compression
         result = await ArchiveCompressor.compressFile(buffer, filename, mimetype, options);
       }
 
-      // Add metadata
       result.filename = filename;
       result.originalMimetype = mimetype;
       result.compressedAt = new Date().toISOString();
@@ -460,9 +411,6 @@ class FileCompressor {
     }, context);
   }
 
-  /**
-   * Generate thumbnail for supported file types
-   */
   static async generateThumbnail(buffer, mimetype, options = {}) {
     const context = {
       operationName: 'Thumbnail Generation',
@@ -479,9 +427,6 @@ class FileCompressor {
     }, context);
   }
 
-  /**
-   * Check if file type supports compression
-   */
   static isCompressionSupported(mimetype) {
     const supportedTypes = [
       'image/jpeg',
@@ -495,9 +440,6 @@ class FileCompressor {
     return supportedTypes.includes(mimetype);
   }
 
-  /**
-   * Get optimal compression settings for file type
-   */
   static getCompressionSettings(mimetype, fileSize) {
     const settings = {
       shouldCompress: this.isCompressionSupported(mimetype),
@@ -509,11 +451,11 @@ class FileCompressor {
       settings.estimatedRatio = 0.7;
       settings.minSize = COMPRESSION_CONFIG.image.minSizeForCompression;
     } else if (mimetype === 'text/csv') {
-      settings.estimatedRatio = 0.3; // CSV compresses very well
-      settings.minSize = 1024; // Compress even small CSV files
+      settings.estimatedRatio = 0.3; 
+      settings.minSize = 1024;
     } else if (mimetype === 'application/pdf') {
       settings.estimatedRatio = 0.8;
-      settings.minSize = 100 * 1024; // 100KB
+      settings.minSize = 100 * 1024;
     }
 
     return settings;

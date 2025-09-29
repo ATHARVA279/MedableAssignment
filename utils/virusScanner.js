@@ -8,9 +8,6 @@ const config = require('../config');
 
 const execAsync = promisify(exec);
 
-/**
- * Real virus scanning integration
- */
 class VirusScanner {
   constructor() {
     this.scanners = {
@@ -18,11 +15,6 @@ class VirusScanner {
     };
   }
 
-
-
-  /**
-   * Main virus scan method
-   */
   async scanFile(fileBuffer, fileName, options = {}) {
     const scanId = crypto.randomUUID();
     const startTime = Date.now();
@@ -30,7 +22,6 @@ class VirusScanner {
     logger.info('Starting virus scan', { scanId, fileName, size: fileBuffer.length });
 
     try {
-      // Determine which scanner to use
       const scannerType = options.scanner || this.getAvailableScanner();
       const scanner = this.scanners[scannerType];
       
@@ -38,7 +29,6 @@ class VirusScanner {
         throw new Error(`Unknown scanner type: ${scannerType}`);
       }
 
-      // Perform the scan
       const result = await scanner(fileBuffer, fileName, { scanId, ...options });
       
       const duration = Date.now() - startTime;
@@ -71,9 +61,6 @@ class VirusScanner {
         duration,
         error: error.message
       });
-
-      // In production, you might want to fail-safe (allow file) or fail-secure (block file)
-      // For security, we'll fail-secure by default
       return {
         scanId,
         clean: false,
@@ -86,15 +73,9 @@ class VirusScanner {
     }
   }
 
-
-
-  /**
-   * Scan with VirusTotal API
-   */
   async scanWithVirusTotal(fileBuffer, fileName, options = {}) {
     const apiKey = config.security.virusTotalApiKey || process.env.VIRUSTOTAL_API_KEY;
     
-    // Enhanced logging for debugging
     logger.info('VirusTotal scan starting', {
       fileName,
       hasApiKey: !!apiKey,
@@ -111,7 +92,6 @@ class VirusScanner {
     logger.info('File hash calculated', { fileName, fileHash });
     
     try {
-      // First, check if file hash is already known
       logger.info('Checking VirusTotal for existing scan results', { fileHash });
       
       const hashCheckResponse = await fetch(`https://www.virustotal.com/vtapi/v2/file/report`, {
@@ -137,7 +117,6 @@ class VirusScanner {
       });
       
       if (hashResult.response_code === 1) {
-        // File already scanned
         logger.info('File already exists in VirusTotal database', { 
           fileName, 
           fileHash,
@@ -147,7 +126,6 @@ class VirusScanner {
         return this.parseVirusTotalResult(hashResult);
       }
 
-      // File not known, upload for scanning
       logger.info('File not found in VirusTotal, uploading for scanning', { fileName, fileHash });
       
       const formData = new FormData();
@@ -179,7 +157,6 @@ class VirusScanner {
         throw new Error(`VirusTotal upload failed: ${uploadResult.verbose_msg}`);
       }
 
-      // Wait a bit and check results
       logger.info('Waiting 5 seconds before checking scan results', { scanId: uploadResult.scan_id });
       await new Promise(resolve => setTimeout(resolve, 5000));
       
@@ -214,13 +191,10 @@ class VirusScanner {
     }
   }
 
-  /**
-   * Parse VirusTotal API response
-   */
   parseVirusTotalResult(result) {
     if (result.response_code !== 1) {
       return {
-        clean: true, // Unknown file, assume clean
+        clean: true,
         threats: [],
         metadata: { status: 'unknown', message: result.verbose_msg }
       };
@@ -253,11 +227,6 @@ class VirusScanner {
     };
   }
 
-
-
-  /**
-   * Determine which scanner is available
-   */
   getAvailableScanner() {
     const apiKey = config.security.virusTotalApiKey || process.env.VIRUSTOTAL_API_KEY;
     
@@ -270,14 +239,10 @@ class VirusScanner {
     }
   }
 
-  /**
-   * Batch scan multiple files
-   */
   async scanMultipleFiles(files, options = {}) {
     const results = [];
     const concurrency = options.concurrency || 3;
     
-    // Process files in batches to avoid overwhelming the scanner
     for (let i = 0; i < files.length; i += concurrency) {
       const batch = files.slice(i, i + concurrency);
       
@@ -302,16 +267,12 @@ class VirusScanner {
     return results;
   }
 
-  /**
-   * Get scanner health status
-   */
   async getHealthStatus() {
     const status = {
       timestamp: new Date().toISOString(),
       scanners: {}
     };
 
-    // Test VirusTotal
     const vtApiKey = config.security.virusTotalApiKey || process.env.VIRUSTOTAL_API_KEY;
     status.scanners.virustotal = {
       available: !!vtApiKey,
@@ -323,7 +284,6 @@ class VirusScanner {
   }
 }
 
-// Global virus scanner instance
 const virusScanner = new VirusScanner();
 
 module.exports = {

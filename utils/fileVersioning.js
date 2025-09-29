@@ -2,23 +2,13 @@ const { v4: uuidv4 } = require('uuid');
 const { logger } = require('./logger');
 const { saveFile, deleteFile } = require('./fileStorage');
 
-/**
- * File Versioning System
- * Manages file versions and tracks changes
- */
-
-// In-memory storage for file versions (use database in production)
 const fileVersions = new Map();
 
-/**
- * Create a new file version
- */
 async function createFileVersion(originalFileId, fileBuffer, originalName, mimetype, userId, changeDescription = '') {
   try {
     const versionId = uuidv4();
     const versionNumber = getNextVersionNumber(originalFileId);
     
-    // Upload new version to storage
     const storageResult = await saveFile(fileBuffer, originalName, mimetype, {
       public_id: `file-processing/versions/${originalFileId}-v${versionNumber}-${Date.now()}`
     });
@@ -38,8 +28,7 @@ async function createFileVersion(originalFileId, fileBuffer, originalName, mimet
       isActive: true,
       storageResult
     };
-    
-    // Store version
+
     if (!fileVersions.has(originalFileId)) {
       fileVersions.set(originalFileId, []);
     }
@@ -63,25 +52,17 @@ async function createFileVersion(originalFileId, fileBuffer, originalName, mimet
   }
 }
 
-/**
- * Get all versions of a file
- */
 function getFileVersions(fileId, userId, userRole) {
   const versions = fileVersions.get(fileId) || [];
   
-  // Filter versions based on access control
   return versions
     .filter(version => version.isActive)
     .filter(version => {
-      // Owner or admin can see all versions
       return version.createdBy === userId || userRole === 'admin';
     })
-    .sort((a, b) => b.versionNumber - a.versionNumber); // Latest first
+    .sort((a, b) => b.versionNumber - a.versionNumber); 
 }
 
-/**
- * Get specific version
- */
 function getFileVersion(fileId, versionId, userId, userRole) {
   const versions = fileVersions.get(fileId) || [];
   const version = versions.find(v => v.versionId === versionId && v.isActive);
@@ -90,7 +71,6 @@ function getFileVersion(fileId, versionId, userId, userRole) {
     return null;
   }
   
-  // Check access control
   if (version.createdBy !== userId && userRole !== 'admin') {
     return null;
   }
@@ -98,17 +78,11 @@ function getFileVersion(fileId, versionId, userId, userRole) {
   return version;
 }
 
-/**
- * Get latest version of a file
- */
 function getLatestVersion(fileId, userId, userRole) {
   const versions = getFileVersions(fileId, userId, userRole);
   return versions.length > 0 ? versions[0] : null;
 }
 
-/**
- * Delete a specific version
- */
 async function deleteFileVersion(fileId, versionId, userId, userRole) {
   try {
     const versions = fileVersions.get(fileId) || [];
@@ -120,24 +94,18 @@ async function deleteFileVersion(fileId, versionId, userId, userRole) {
     
     const version = versions[versionIndex];
     
-    // Check access control
     if (version.createdBy !== userId && userRole !== 'admin') {
       throw new Error('Access denied');
     }
     
-    // Don't allow deletion of the only version
     const activeVersions = versions.filter(v => v.isActive);
     if (activeVersions.length <= 1) {
       throw new Error('Cannot delete the only version of a file');
     }
     
-    // Mark as inactive instead of deleting
     version.isActive = false;
     version.deletedAt = new Date().toISOString();
     version.deletedBy = userId;
-    
-    // Optionally delete from storage (commented out to preserve data)
-    // await deleteFile(version.publicId, getResourceType(version.mimetype));
     
     logger.info('File version deleted', {
       fileId,
@@ -158,9 +126,6 @@ async function deleteFileVersion(fileId, versionId, userId, userRole) {
   }
 }
 
-/**
- * Restore a specific version (make it the latest)
- */
 async function restoreFileVersion(fileId, versionId, userId, userRole) {
   try {
     const version = getFileVersion(fileId, versionId, userId, userRole);
@@ -169,17 +134,15 @@ async function restoreFileVersion(fileId, versionId, userId, userRole) {
       throw new Error('Version not found or access denied');
     }
     
-    // Create a new version based on the restored version
     const restoredVersion = await createFileVersion(
       fileId,
-      null, // We don't have the buffer, so this would need to be fetched from storage
+      null,
       version.originalName,
       version.mimetype,
       userId,
       `Restored from version ${version.versionNumber}`
     );
     
-    // Copy the storage details from the original version
     restoredVersion.publicId = version.publicId;
     restoredVersion.secureUrl = version.secureUrl;
     restoredVersion.size = version.size;
@@ -203,9 +166,6 @@ async function restoreFileVersion(fileId, versionId, userId, userRole) {
   }
 }
 
-/**
- * Get version comparison data
- */
 function compareVersions(fileId, version1Id, version2Id, userId, userRole) {
   const version1 = getFileVersion(fileId, version1Id, userId, userRole);
   const version2 = getFileVersion(fileId, version2Id, userId, userRole);
@@ -239,9 +199,6 @@ function compareVersions(fileId, version1Id, version2Id, userId, userRole) {
   };
 }
 
-/**
- * Get next version number for a file
- */
 function getNextVersionNumber(fileId) {
   const versions = fileVersions.get(fileId) || [];
   const maxVersion = versions.reduce((max, version) => {
@@ -250,18 +207,12 @@ function getNextVersionNumber(fileId) {
   return maxVersion + 1;
 }
 
-/**
- * Get resource type based on mimetype
- */
 function getResourceType(mimetype) {
   if (mimetype.startsWith('image/')) return 'image';
   if (mimetype.startsWith('video/')) return 'video';
   return 'raw';
 }
 
-/**
- * Get version statistics for a file
- */
 function getVersionStats(fileId, userId, userRole) {
   const versions = getFileVersions(fileId, userId, userRole);
   
@@ -282,19 +233,15 @@ function getVersionStats(fileId, userId, userRole) {
   };
 }
 
-/**
- * Clean up old versions (keep only N latest versions)
- */
 async function cleanupOldVersions(fileId, keepCount = 10) {
   try {
     const versions = fileVersions.get(fileId) || [];
     const activeVersions = versions.filter(v => v.isActive);
     
     if (activeVersions.length <= keepCount) {
-      return 0; // Nothing to clean up
+      return 0;
     }
     
-    // Sort by version number and keep only the latest N
     const sortedVersions = activeVersions.sort((a, b) => b.versionNumber - a.versionNumber);
     const versionsToDelete = sortedVersions.slice(keepCount);
     

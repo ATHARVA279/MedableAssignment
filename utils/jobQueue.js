@@ -4,12 +4,6 @@ const { logger } = require('./logger');
 const { retryOperations, RetryManager } = require('./retryManager');
 const { AppError, RetryableError, PermanentError } = require('../middleware/errorHandler');
 
-/**
- * Robust job queue system for file processing operations
- * Supports persistence, retry logic, priority handling, and monitoring
- */
-
-// Job priorities
 const JOB_PRIORITIES = {
   LOW: 1,
   NORMAL: 2,
@@ -18,7 +12,6 @@ const JOB_PRIORITIES = {
   CRITICAL: 5
 };
 
-// Job statuses
 const JOB_STATUSES = {
   PENDING: 'pending',
   QUEUED: 'queued',
@@ -29,7 +22,6 @@ const JOB_STATUSES = {
   RETRYING: 'retrying'
 };
 
-// Job types
 const JOB_TYPES = {
   FILE_UPLOAD: 'file_upload',
   FILE_PROCESSING: 'file_processing',
@@ -40,9 +32,6 @@ const JOB_TYPES = {
   FILE_CLEANUP: 'file_cleanup'
 };
 
-/**
- * Job class representing a single processing job
- */
 class Job {
   constructor(data) {
     this.id = data.id || uuidv4();
@@ -64,7 +53,6 @@ class Job {
     this.progress = 0;
     this.metadata = data.metadata || {};
     
-    // Retry configuration
     this.retryManager = new RetryManager({
       maxRetries: this.maxAttempts - 1,
       initialDelay: 1000,
@@ -73,9 +61,6 @@ class Job {
     });
   }
 
-  /**
-   * Update job status
-   */
   updateStatus(status, data = {}) {
     this.status = status;
     this.updatedAt = new Date();
@@ -106,18 +91,12 @@ class Job {
     });
   }
 
-  /**
-   * Check if job can be retried
-   */
   canRetry() {
     return this.attempts < this.maxAttempts && 
            this.status === JOB_STATUSES.FAILED &&
            this.nextAttemptAt <= new Date();
   }
 
-  /**
-   * Prepare job for retry
-   */
   prepareRetry() {
     if (!this.canRetry()) {
       throw new Error('Job cannot be retried');
@@ -127,7 +106,6 @@ class Job {
     this.status = JOB_STATUSES.RETRYING;
     this.updatedAt = new Date();
     
-    // Calculate next attempt time with exponential backoff
     const delay = Math.min(1000 * Math.pow(2, this.attempts - 1), 60000);
     this.nextAttemptAt = new Date(Date.now() + delay);
 
@@ -140,9 +118,6 @@ class Job {
     });
   }
 
-  /**
-   * Get job summary
-   */
   getSummary() {
     return {
       id: this.id,
@@ -163,9 +138,6 @@ class Job {
   }
 }
 
-/**
- * Job Queue Manager with persistence and monitoring
- */
 class JobQueue extends EventEmitter {
   constructor(options = {}) {
     super();
@@ -173,20 +145,17 @@ class JobQueue extends EventEmitter {
     this.name = options.name || 'default';
     this.concurrency = options.concurrency || 5;
     this.maxJobs = options.maxJobs || 1000;
-    this.cleanupInterval = options.cleanupInterval || 60000; // 1 minute
-    this.retryInterval = options.retryInterval || 30000; // 30 seconds
+    this.cleanupInterval = options.cleanupInterval || 60000; 
+    this.retryInterval = options.retryInterval || 30000; 
     
-    // Job storage (in-memory, but designed for easy database integration)
     this.jobs = new Map();
     this.processing = new Map();
     this.completed = [];
     this.failed = [];
     
-    // Queue management
     this.isProcessing = false;
     this.processingCount = 0;
     
-    // Statistics
     this.stats = {
       totalJobs: 0,
       completedJobs: 0,
@@ -196,10 +165,8 @@ class JobQueue extends EventEmitter {
       lastProcessedAt: null
     };
 
-    // Job processors registry
     this.processors = new Map();
     
-    // Start background processes
     this.startCleanupTimer();
     this.startRetryTimer();
 
@@ -210,9 +177,6 @@ class JobQueue extends EventEmitter {
     });
   }
 
-  /**
-   * Register a job processor
-   */
   registerProcessor(jobType, processor) {
     if (typeof processor !== 'function') {
       throw new Error('Processor must be a function');
@@ -222,9 +186,6 @@ class JobQueue extends EventEmitter {
     logger.debug('Job processor registered', { jobType, queueName: this.name });
   }
 
-  /**
-   * Add job to queue
-   */
   async addJob(jobType, data, options = {}) {
     try {
       if (this.jobs.size >= this.maxJobs) {
@@ -260,7 +221,6 @@ class JobQueue extends EventEmitter {
 
       this.emit('job:added', job);
       
-      // Start processing if not already running
       if (!this.isProcessing) {
         setImmediate(() => this.processQueue());
       }
@@ -277,9 +237,6 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Process jobs in the queue
-   */
   async processQueue() {
     if (this.isProcessing || this.processingCount >= this.concurrency) {
       return;
@@ -304,9 +261,6 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Get next job to process (priority-based)
-   */
   getNextJob() {
     const availableJobs = Array.from(this.jobs.values())
       .filter(job => 
@@ -314,7 +268,6 @@ class JobQueue extends EventEmitter {
         job.nextAttemptAt <= new Date()
       )
       .sort((a, b) => {
-        // Sort by priority (higher first), then by creation time (older first)
         if (a.priority !== b.priority) {
           return b.priority - a.priority;
         }
@@ -324,9 +277,6 @@ class JobQueue extends EventEmitter {
     return availableJobs[0] || null;
   }
 
-  /**
-   * Process individual job
-   */
   async processJob(job) {
     this.processingCount++;
     this.processing.set(job.id, job);
@@ -352,13 +302,11 @@ class JobQueue extends EventEmitter {
         throw new PermanentError(`No processor found for job type: ${job.type}`);
       }
 
-      // Execute job with timeout
       const result = await Promise.race([
         processor(job.data, job),
         this.createJobTimeout(job)
       ]);
 
-      // Job completed successfully
       const processingTime = Date.now() - startTime;
       job.completedAt = new Date();
       job.updateStatus(JOB_STATUSES.COMPLETED, { result });
@@ -376,7 +324,6 @@ class JobQueue extends EventEmitter {
       this.emit('job:completed', job, result);
 
     } catch (error) {
-      // Job failed
       const processingTime = Date.now() - startTime;
       const isRetryable = !(error instanceof PermanentError);
       
@@ -392,7 +339,6 @@ class JobQueue extends EventEmitter {
         processingTime
       });
 
-      // Check if job should be retried
       if (job.canRetry() && isRetryable) {
         job.prepareRetry();
         this.stats.retriedJobs++;
@@ -405,7 +351,6 @@ class JobQueue extends EventEmitter {
 
         this.emit('job:retry', job, error);
       } else {
-        // Move to failed jobs
         this.moveJobToFailed(job);
         this.updateStats(false, processingTime);
         
@@ -422,14 +367,10 @@ class JobQueue extends EventEmitter {
       this.processing.delete(job.id);
       this.processingCount--;
       
-      // Continue processing queue
       setImmediate(() => this.processQueue());
     }
   }
 
-  /**
-   * Create timeout promise for job processing
-   */
   createJobTimeout(job) {
     const timeout = job.metadata.timeout || 300000; // 5 minutes default
     
@@ -440,35 +381,24 @@ class JobQueue extends EventEmitter {
     });
   }
 
-  /**
-   * Move job to completed list
-   */
   moveJobToCompleted(job) {
     this.jobs.delete(job.id);
     this.completed.push(job);
     
-    // Keep only recent completed jobs
     if (this.completed.length > 100) {
       this.completed.shift();
     }
   }
 
-  /**
-   * Move job to failed list
-   */
   moveJobToFailed(job) {
     this.jobs.delete(job.id);
     this.failed.push(job);
     
-    // Keep only recent failed jobs
     if (this.failed.length > 50) {
       this.failed.shift();
     }
   }
 
-  /**
-   * Update queue statistics
-   */
   updateStats(success, processingTime) {
     if (success) {
       this.stats.completedJobs++;
@@ -476,7 +406,6 @@ class JobQueue extends EventEmitter {
       this.stats.failedJobs++;
     }
 
-    // Update average processing time
     const totalProcessed = this.stats.completedJobs + this.stats.failedJobs;
     this.stats.averageProcessingTime = 
       (this.stats.averageProcessingTime * (totalProcessed - 1) + processingTime) / totalProcessed;
@@ -484,18 +413,12 @@ class JobQueue extends EventEmitter {
     this.stats.lastProcessedAt = new Date();
   }
 
-  /**
-   * Get job by ID
-   */
   getJob(jobId) {
     return this.jobs.get(jobId) || 
            this.completed.find(j => j.id === jobId) ||
            this.failed.find(j => j.id === jobId);
   }
 
-  /**
-   * Cancel job
-   */
   async cancelJob(jobId) {
     const job = this.jobs.get(jobId);
     if (!job) {
@@ -515,9 +438,6 @@ class JobQueue extends EventEmitter {
     return job;
   }
 
-  /**
-   * Get queue statistics
-   */
   getStats() {
     return {
       ...this.stats,
@@ -529,9 +449,6 @@ class JobQueue extends EventEmitter {
     };
   }
 
-  /**
-   * Get jobs by status or user
-   */
   getJobs(filters = {}) {
     let jobs = Array.from(this.jobs.values());
     
@@ -550,36 +467,25 @@ class JobQueue extends EventEmitter {
     return jobs.map(job => job.getSummary());
   }
 
-  /**
-   * Start cleanup timer for old jobs
-   */
   startCleanupTimer() {
     setInterval(() => {
       this.cleanupOldJobs();
     }, this.cleanupInterval);
   }
 
-  /**
-   * Start retry timer for failed jobs
-   */
   startRetryTimer() {
     setInterval(() => {
       this.retryFailedJobs();
     }, this.retryInterval);
   }
 
-  /**
-   * Cleanup old completed/failed jobs
-   */
   cleanupOldJobs() {
     const cutoffTime = Date.now() - (24 * 60 * 60 * 1000); // 24 hours
 
-    // Clean completed jobs
     this.completed = this.completed.filter(job => 
       job.completedAt && job.completedAt.getTime() > cutoffTime
     );
 
-    // Clean failed jobs
     this.failed = this.failed.filter(job => 
       job.updatedAt.getTime() > cutoffTime
     );
@@ -591,9 +497,6 @@ class JobQueue extends EventEmitter {
     });
   }
 
-  /**
-   * Retry failed jobs that are eligible for retry
-   */
   retryFailedJobs() {
     const retryableJobs = Array.from(this.jobs.values())
       .filter(job => job.status === JOB_STATUSES.FAILED && job.canRetry());
@@ -611,13 +514,9 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Shutdown queue gracefully
-   */
   async shutdown() {
     logger.info('Shutting down job queue', { queueName: this.name });
     
-    // Wait for current jobs to complete
     while (this.processingCount > 0) {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -627,18 +526,12 @@ class JobQueue extends EventEmitter {
   }
 }
 
-/**
- * Queue manager for multiple queues
- */
 class QueueManager {
   constructor() {
     this.queues = new Map();
     this.defaultQueue = null;
   }
 
-  /**
-   * Create or get queue
-   */
   getQueue(name = 'default', options = {}) {
     if (!this.queues.has(name)) {
       const queue = new JobQueue({ name, ...options });
@@ -652,9 +545,6 @@ class QueueManager {
     return this.queues.get(name);
   }
 
-  /**
-   * Get all queue statistics
-   */
   getAllStats() {
     const stats = {};
     for (const [name, queue] of this.queues) {
@@ -663,9 +553,6 @@ class QueueManager {
     return stats;
   }
 
-  /**
-   * Shutdown all queues
-   */
   async shutdown() {
     const shutdownPromises = Array.from(this.queues.values())
       .map(queue => queue.shutdown());
@@ -676,7 +563,6 @@ class QueueManager {
   }
 }
 
-// Global queue manager instance
 const queueManager = new QueueManager();
 
 module.exports = {

@@ -1,13 +1,9 @@
 const validator = require('validator');
 const { logger } = require('./logger');
 
-/**
- * Comprehensive Input Sanitization and Validation
- */
 class InputSanitizer {
   constructor() {
     this.patterns = {
-      // XSS patterns
       xss: [
         /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
         /javascript:/gi,
@@ -19,7 +15,6 @@ class InputSanitizer {
         /<meta\b[^<]*(?:(?!<\/meta>)<[^<]*)*<\/meta>/gi
       ],
       
-      // SQL injection patterns
       sqlInjection: [
         /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)/gi,
         /(\b(OR|AND)\s+\d+\s*=\s*\d+)/gi,
@@ -27,7 +22,6 @@ class InputSanitizer {
         /(\b(WAITFOR|DELAY)\b)/gi
       ],
       
-      // Path traversal patterns
       pathTraversal: [
         /\.\.\//g,
         /\.\.\\/g,
@@ -37,13 +31,11 @@ class InputSanitizer {
         /\.\.%5c/gi
       ],
       
-      // Command injection patterns
       commandInjection: [
         /[;&|`$(){}[\]]/g,
         /\b(cat|ls|pwd|whoami|id|uname|ps|netstat|ifconfig|ping|wget|curl|nc|telnet|ssh|ftp)\b/gi
       ],
       
-      // LDAP injection patterns
       ldapInjection: [
         /[()=*!&|]/g,
         /\x00/g
@@ -62,14 +54,10 @@ class InputSanitizer {
     };
   }
 
-  /**
-   * Sanitize and validate file upload data
-   */
   sanitizeFileUpload(data) {
     const sanitized = {};
     const errors = [];
 
-    // Sanitize filename
     if (data.originalName) {
       sanitized.originalName = this.sanitizeFileName(data.originalName);
       if (!this.validateFileName(sanitized.originalName)) {
@@ -77,7 +65,6 @@ class InputSanitizer {
       }
     }
 
-    // Sanitize description
     if (data.description) {
       sanitized.description = this.sanitizeText(data.description, this.maxLengths.description);
       if (!sanitized.description) {
@@ -85,19 +72,17 @@ class InputSanitizer {
       }
     }
 
-    // Sanitize tags
     if (data.tags) {
       if (Array.isArray(data.tags)) {
         sanitized.tags = data.tags
           .map(tag => this.sanitizeText(tag, this.maxLengths.tag))
           .filter(tag => tag && tag.length > 0)
-          .slice(0, 10); // Max 10 tags
+          .slice(0, 10); 
       } else {
         errors.push('Tags must be an array');
       }
     }
 
-    // Validate boolean fields
     if (data.publicAccess !== undefined) {
       if (typeof data.publicAccess === 'boolean') {
         sanitized.publicAccess = data.publicAccess;
@@ -108,7 +93,6 @@ class InputSanitizer {
       }
     }
 
-    // Sanitize metadata
     if (data.metadata && typeof data.metadata === 'object') {
       sanitized.metadata = this.sanitizeObject(data.metadata);
     }
@@ -120,24 +104,17 @@ class InputSanitizer {
     };
   }
 
-  /**
-   * Sanitize filename
-   */
   sanitizeFileName(filename) {
     if (!filename || typeof filename !== 'string') {
       return '';
     }
 
-    // Remove path traversal attempts
     let sanitized = filename.replace(/\.\.\//g, '').replace(/\.\.\\/g, '');
     
-    // Remove null bytes and control characters
     sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
     
-    // Remove dangerous characters
     sanitized = sanitized.replace(/[<>:"|?*]/g, '');
     
-    // Limit length
     if (sanitized.length > this.maxLengths.fileName) {
       const ext = sanitized.substring(sanitized.lastIndexOf('.'));
       const name = sanitized.substring(0, sanitized.lastIndexOf('.'));
@@ -147,15 +124,11 @@ class InputSanitizer {
     return sanitized.trim();
   }
 
-  /**
-   * Validate filename
-   */
   validateFileName(filename) {
     if (!filename || filename.length === 0) {
       return false;
     }
 
-    // Check for reserved names (Windows)
     const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
     const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.') || filename.length).toUpperCase();
     
@@ -163,44 +136,34 @@ class InputSanitizer {
       return false;
     }
 
-    // Check for valid characters
     const validPattern = /^[a-zA-Z0-9._\-\s()[\]{}]+$/;
     return validPattern.test(filename);
   }
 
-  /**
-   * Sanitize general text input
-   */
   sanitizeText(text, maxLength = this.maxLengths.general) {
     if (!text || typeof text !== 'string') {
       return '';
     }
 
-    // Remove XSS patterns
     let sanitized = text;
     this.patterns.xss.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    // Remove SQL injection patterns
     this.patterns.sqlInjection.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    // Remove command injection patterns
     this.patterns.commandInjection.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    // Remove path traversal patterns
     this.patterns.pathTraversal.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    // Remove null bytes and control characters
     sanitized = sanitized.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
-    // Trim and limit length
     sanitized = sanitized.trim();
     if (sanitized.length > maxLength) {
       sanitized = sanitized.substring(0, maxLength);
@@ -209,34 +172,24 @@ class InputSanitizer {
     return sanitized;
   }
 
-  /**
-   * Sanitize HTML content (allow only safe tags)
-   */
   sanitizeHTML(html) {
     if (!html || typeof html !== 'string') {
       return '';
     }
 
-    // Remove script tags and their content
     let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     
-    // Remove dangerous attributes
     sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
     sanitized = sanitized.replace(/\s*javascript\s*:/gi, '');
     
-    // Remove style attributes (potential for CSS injection)
     sanitized = sanitized.replace(/\s*style\s*=\s*["'][^"']*["']/gi, '');
     
-    // Allow only specific tags
     const allowedTagsPattern = new RegExp(`<(?!\/?(?:${this.allowedTags.join('|')})\s*\/?>)[^>]+>`, 'gi');
     sanitized = sanitized.replace(allowedTagsPattern, '');
 
     return sanitized.trim();
   }
 
-  /**
-   * Sanitize email address
-   */
   sanitizeEmail(email) {
     if (!email || typeof email !== 'string') {
       return '';
@@ -251,9 +204,6 @@ class InputSanitizer {
     return validator.isEmail(sanitized) ? sanitized : '';
   }
 
-  /**
-   * Sanitize URL
-   */
   sanitizeURL(url) {
     if (!url || typeof url !== 'string') {
       return '';
@@ -265,7 +215,6 @@ class InputSanitizer {
       return '';
     }
 
-    // Check for valid URL format
     if (!validator.isURL(sanitized, { 
       protocols: ['http', 'https'],
       require_protocol: true 
@@ -276,9 +225,6 @@ class InputSanitizer {
     return sanitized;
   }
 
-  /**
-   * Sanitize object recursively
-   */
   sanitizeObject(obj, maxDepth = 3, currentDepth = 0) {
     if (currentDepth >= maxDepth) {
       return {};
@@ -287,11 +233,9 @@ class InputSanitizer {
     const sanitized = {};
 
     for (const [key, value] of Object.entries(obj)) {
-      // Sanitize key
       const sanitizedKey = this.sanitizeText(key, 50);
       if (!sanitizedKey) continue;
 
-      // Sanitize value based on type
       if (typeof value === 'string') {
         sanitized[sanitizedKey] = this.sanitizeText(value);
       } else if (typeof value === 'number') {
@@ -302,7 +246,7 @@ class InputSanitizer {
         sanitized[sanitizedKey] = value;
       } else if (Array.isArray(value)) {
         sanitized[sanitizedKey] = value
-          .slice(0, 100) // Max 100 items
+          .slice(0, 100) 
           .map(item => {
             if (typeof item === 'string') {
               return this.sanitizeText(item);
@@ -320,9 +264,6 @@ class InputSanitizer {
     return sanitized;
   }
 
-  /**
-   * Validate and sanitize query parameters
-   */
   sanitizeQueryParams(query) {
     const sanitized = {};
     const errors = [];
@@ -346,7 +287,7 @@ class InputSanitizer {
         sanitized[sanitizedKey] = sanitizedValue;
       } else if (Array.isArray(value)) {
         sanitized[sanitizedKey] = value
-          .slice(0, 10) // Max 10 values per parameter
+          .slice(0, 10) 
           .map(v => this.sanitizeText(String(v), 200))
           .filter(v => v.length > 0);
       } else {
@@ -361,9 +302,6 @@ class InputSanitizer {
     };
   }
 
-  /**
-   * Validate file metadata
-   */
   validateFileMetadata(metadata) {
     const errors = [];
 
@@ -399,43 +337,30 @@ class InputSanitizer {
     };
   }
 
-  /**
-   * Sanitize user input for search
-   */
   sanitizeSearchQuery(query) {
     if (!query || typeof query !== 'string') {
       return '';
     }
 
-    // Remove special regex characters that could cause ReDoS
     let sanitized = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-    // Remove SQL injection patterns
     this.patterns.sqlInjection.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    // Limit length
     sanitized = sanitized.trim().substring(0, 100);
 
     return sanitized;
   }
 
-  /**
-   * Rate limit key sanitization
-   */
   sanitizeRateLimitKey(key) {
     if (!key || typeof key !== 'string') {
       return 'unknown';
     }
 
-    // Remove special characters and limit length
     return key.replace(/[^a-zA-Z0-9._-]/g, '').substring(0, 50) || 'sanitized';
   }
 
-  /**
-   * Log sanitization events
-   */
   logSanitization(type, original, sanitized, context = {}) {
     if (original !== sanitized) {
       logger.warn('Input sanitized', {
@@ -448,9 +373,6 @@ class InputSanitizer {
     }
   }
 
-  /**
-   * Batch sanitize multiple inputs
-   */
   sanitizeBatch(inputs) {
     const results = {};
     const errors = [];
@@ -483,9 +405,6 @@ class InputSanitizer {
     };
   }
 
-  /**
-   * Get sanitization statistics
-   */
   getStats() {
     return {
       patterns: Object.keys(this.patterns).reduce((acc, key) => {
@@ -499,7 +418,6 @@ class InputSanitizer {
   }
 }
 
-// Global input sanitizer instance
 const inputSanitizer = new InputSanitizer();
 
 module.exports = {

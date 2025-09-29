@@ -29,7 +29,7 @@ class DatabaseConnection {
         database: mongoose.connection.db.databaseName
       });
       
-      console.log('🍃 MongoDB connected successfully');
+      console.log('MongoDB connected successfully');
       
       return true;
     } catch (error) {
@@ -42,13 +42,13 @@ class DatabaseConnection {
         maxRetries: this.maxRetries
       });
       
-      console.error('❌ MongoDB connection failed:', error.message);
+      console.error('MongoDB connection failed:', error.message);
       
       if (this.connectionAttempts < this.maxRetries) {
-        console.log(`🔄 Retrying connection in ${this.retryDelay / 1000} seconds...`);
+        console.log(`Retrying connection in ${this.retryDelay / 1000} seconds...`);
         setTimeout(() => this.connect(), this.retryDelay);
       } else {
-        console.error('❌ Max connection attempts reached. Exiting...');
+        console.error('Max connection attempts reached. Exiting...');
         process.exit(1);
       }
       
@@ -62,12 +62,12 @@ class DatabaseConnection {
       this.isConnected = false;
       
       logger.info('MongoDB disconnected successfully');
-      console.log('🍃 MongoDB disconnected');
+      console.log('MongoDB disconnected');
       
       return true;
     } catch (error) {
       logger.error('MongoDB disconnection failed', { error: error.message });
-      console.error('❌ MongoDB disconnection failed:', error.message);
+      console.error('MongoDB disconnection failed:', error.message);
       return false;
     }
   }

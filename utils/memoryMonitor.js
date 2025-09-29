@@ -1,23 +1,19 @@
 const { logger } = require('./logger');
 const { EventEmitter } = require('events');
-
-/**
- * Memory Monitor and Protection System
- */
 class MemoryMonitor extends EventEmitter {
   constructor() {
     super();
     this.thresholds = {
-      warning: 0.85,   // 85% memory usage warning
-      critical: 0.93,  // 93% memory usage critical (raised from 90%)
-      emergency: 0.97  // 97% memory usage emergency (raised from 95%)
+      warning: 0.85,   
+      critical: 0.93,  
+      emergency: 0.97  
     };
     
     this.limits = {
-      maxFileSize: 50 * 1024 * 1024,      // 50MB per file
-      maxConcurrentUploads: 5,             // Max concurrent uploads
-      maxTotalMemoryUsage: 200 * 1024 * 1024, // 200MB total for file processing
-      streamingThreshold: 10 * 1024 * 1024    // Files > 10MB use streaming
+      maxFileSize: 50 * 1024 * 1024,      
+      maxConcurrentUploads: 5,           
+      maxTotalMemoryUsage: 200 * 1024 * 1024,
+      streamingThreshold: 10 * 1024 * 1024  
     };
 
     this.activeUploads = new Map();
@@ -28,14 +24,11 @@ class MemoryMonitor extends EventEmitter {
     };
 
     this.isMonitoring = false;
-    this.isCleaningUp = false; // Prevent recursive cleanup
-    this.lastCleanupTime = 0;  // Throttle cleanup operations
+    this.isCleaningUp = false; 
+    this.lastCleanupTime = 0;  
     this.monitoringInterval = null;
   }
 
-  /**
-   * Start memory monitoring
-   */
   startMonitoring(intervalMs = 5000) {
     if (this.isMonitoring) {
       return;
@@ -53,9 +46,6 @@ class MemoryMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Stop memory monitoring
-   */
   stopMonitoring() {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
@@ -65,11 +55,7 @@ class MemoryMonitor extends EventEmitter {
     logger.info('Memory monitoring stopped');
   }
 
-  /**
-   * Check current memory usage
-   */
   checkMemoryUsage() {
-    // Prevent recursion during cleanup operations
     const skipThresholdChecks = this.isCleaningUp;
     
     const memUsage = process.memoryUsage();
@@ -78,7 +64,6 @@ class MemoryMonitor extends EventEmitter {
     const usedMemory = totalMemory - freeMemory;
     const memoryPercentage = usedMemory / totalMemory;
 
-    // Update memory usage tracking
     this.memoryUsage.current = memUsage.heapUsed;
     this.memoryUsage.peak = Math.max(this.memoryUsage.peak, memUsage.heapUsed);
 
@@ -101,7 +86,6 @@ class MemoryMonitor extends EventEmitter {
       }
     };
 
-    // Check thresholds and emit events (skip during cleanup to prevent recursion)
     if (!skipThresholdChecks) {
       if (memoryPercentage >= this.thresholds.emergency) {
         this.handleEmergencyMemory(status);
@@ -112,17 +96,13 @@ class MemoryMonitor extends EventEmitter {
       }
     }
 
-    // Log memory status periodically
-    if (Date.now() % 60000 < 5000) { // Every minute
+    if (Date.now() % 60000 < 5000) { 
       logger.info('Memory status', status);
     }
 
     return status;
   }
 
-  /**
-   * Handle warning level memory usage
-   */
   handleWarningMemory(status) {
     this.emit('memoryWarning', status);
     logger.warn('Memory usage warning', {
@@ -132,11 +112,7 @@ class MemoryMonitor extends EventEmitter {
     });
   }
 
-  /**
-   * Handle critical level memory usage
-   */
   handleCriticalMemory(status) {
-    // Prevent excessive critical memory handling
     if (this.isCleaningUp) {
       return;
     }
@@ -148,15 +124,10 @@ class MemoryMonitor extends EventEmitter {
       activeUploads: status.uploads.active
     });
 
-    // Start aggressive cleanup
     this.performMemoryCleanup();
   }
 
-  /**
-   * Handle emergency level memory usage
-   */
   handleEmergencyMemory(status) {
-    // Prevent excessive emergency handling
     if (this.isCleaningUp) {
       return;
     }
@@ -167,17 +138,12 @@ class MemoryMonitor extends EventEmitter {
       heapPercentage: status.heap.percentage.toFixed(2) + '%'
     });
 
-    // Emergency actions
     this.performEmergencyCleanup();
   }
 
-  /**
-   * Check if upload can be accepted based on memory constraints
-   */
   canAcceptUpload(fileSize, fileName) {
     const currentMemory = this.checkMemoryUsage();
     
-    // Check file size limit
     if (fileSize > this.limits.maxFileSize) {
       return {
         allowed: false,
@@ -186,7 +152,6 @@ class MemoryMonitor extends EventEmitter {
       };
     }
 
-    // Check concurrent upload limit
     if (this.activeUploads.size >= this.limits.maxConcurrentUploads) {
       return {
         allowed: false,
@@ -195,7 +160,6 @@ class MemoryMonitor extends EventEmitter {
       };
     }
 
-    // Check total memory usage
     if (this.memoryUsage.uploads + fileSize > this.limits.maxTotalMemoryUsage) {
       return {
         allowed: false,
@@ -204,7 +168,6 @@ class MemoryMonitor extends EventEmitter {
       };
     }
 
-    // Check system memory
     if (currentMemory.system.percentage > this.thresholds.critical * 100) {
       return {
         allowed: false,
@@ -213,7 +176,6 @@ class MemoryMonitor extends EventEmitter {
       };
     }
 
-    // Recommend streaming for large files
     const useStreaming = fileSize > this.limits.streamingThreshold;
 
     return {
@@ -223,9 +185,6 @@ class MemoryMonitor extends EventEmitter {
     };
   }
 
-  /**
-   * Register active upload
-   */
   registerUpload(uploadId, fileSize, fileName) {
     const upload = {
       uploadId,
@@ -249,9 +208,6 @@ class MemoryMonitor extends EventEmitter {
     this.emit('uploadRegistered', upload);
   }
 
-  /**
-   * Unregister completed upload
-   */
   unregisterUpload(uploadId) {
     const upload = this.activeUploads.get(uploadId);
     if (upload) {
@@ -270,17 +226,12 @@ class MemoryMonitor extends EventEmitter {
     }
   }
 
-  /**
-   * Perform memory cleanup
-   */
   performMemoryCleanup() {
-    // Prevent recursive cleanup calls
     if (this.isCleaningUp) {
       logger.warn('Memory cleanup already in progress, skipping');
       return;
     }
 
-    // Throttle cleanup operations (minimum 5 seconds between cleanups)
     const now = Date.now();
     if (now - this.lastCleanupTime < 5000) {
       logger.warn('Memory cleanup throttled, too soon since last cleanup');
@@ -293,16 +244,13 @@ class MemoryMonitor extends EventEmitter {
     try {
       logger.info('Starting memory cleanup');
 
-      // Force garbage collection if available
       if (global.gc) {
         global.gc();
         logger.info('Forced garbage collection');
       }
 
-      // Clear any cached data
       this.clearCaches();
 
-      // Get memory stats WITHOUT calling checkMemoryUsage to avoid recursion
       const memUsage = process.memoryUsage();
       logger.info('Memory cleanup completed', {
         heapUsed: this.formatBytes(memUsage.heapUsed),
@@ -316,11 +264,7 @@ class MemoryMonitor extends EventEmitter {
     }
   }
 
-  /**
-   * Perform emergency cleanup
-   */
   performEmergencyCleanup() {
-    // Prevent recursive emergency cleanup
     if (this.isCleaningUp) {
       logger.warn('Emergency cleanup already in progress, skipping');
       return;
@@ -328,7 +272,6 @@ class MemoryMonitor extends EventEmitter {
 
     logger.error('Starting emergency memory cleanup');
 
-    // Cancel oldest uploads if necessary
     const uploads = Array.from(this.activeUploads.values())
       .sort((a, b) => a.startTime - b.startTime);
 
@@ -345,10 +288,8 @@ class MemoryMonitor extends EventEmitter {
       this.unregisterUpload(upload.uploadId);
     }
 
-    // Perform aggressive cleanup (this will handle its own recursion protection)
     this.performMemoryCleanup();
 
-    // Lower limits temporarily
     this.limits.maxConcurrentUploads = Math.max(1, Math.floor(this.limits.maxConcurrentUploads / 2));
     this.limits.maxFileSize = Math.floor(this.limits.maxFileSize / 2);
 
@@ -357,24 +298,15 @@ class MemoryMonitor extends EventEmitter {
       maxFileSize: this.formatBytes(this.limits.maxFileSize)
     });
 
-    // Reset limits after 10 minutes
     setTimeout(() => {
       this.resetLimits();
     }, 10 * 60 * 1000);
   }
 
-  /**
-   * Clear internal caches
-   */
   clearCaches() {
-    // Clear any internal caches here
-    // This is a placeholder for cache clearing logic
     logger.info('Internal caches cleared');
   }
 
-  /**
-   * Reset limits to original values
-   */
   resetLimits() {
     this.limits = {
       maxFileSize: 50 * 1024 * 1024,
@@ -386,9 +318,6 @@ class MemoryMonitor extends EventEmitter {
     logger.info('Memory limits reset to original values', this.limits);
   }
 
-  /**
-   * Get memory statistics
-   */
   getMemoryStats() {
     const currentStatus = this.checkMemoryUsage();
     
@@ -407,27 +336,18 @@ class MemoryMonitor extends EventEmitter {
     };
   }
 
-  /**
-   * Update memory limits
-   */
   updateLimits(newLimits) {
     this.limits = { ...this.limits, ...newLimits };
     logger.info('Memory limits updated', this.limits);
     this.emit('limitsUpdated', this.limits);
   }
 
-  /**
-   * Update memory thresholds
-   */
   updateThresholds(newThresholds) {
     this.thresholds = { ...this.thresholds, ...newThresholds };
     logger.info('Memory thresholds updated', this.thresholds);
     this.emit('thresholdsUpdated', this.thresholds);
   }
 
-  /**
-   * Format bytes to human readable format
-   */
   formatBytes(bytes) {
     if (bytes === 0) return '0 Bytes';
     
@@ -438,9 +358,6 @@ class MemoryMonitor extends EventEmitter {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
-  /**
-   * Create memory usage report
-   */
   generateReport() {
     const stats = this.getMemoryStats();
     const activeUploads = Array.from(this.activeUploads.values());
@@ -469,9 +386,6 @@ class MemoryMonitor extends EventEmitter {
     };
   }
 
-  /**
-   * Generate memory optimization recommendations
-   */
   generateRecommendations(stats) {
     const recommendations = [];
 
@@ -495,10 +409,8 @@ class MemoryMonitor extends EventEmitter {
   }
 }
 
-// Global memory monitor instance
 const memoryMonitor = new MemoryMonitor();
 
-// Start monitoring by default
 memoryMonitor.startMonitoring();
 
 module.exports = {

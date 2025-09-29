@@ -1,0 +1,943 @@
+{
+  "info": {
+    "name": "File Processing API - Assessment 4",
+    "description": "Complete API collection for the File Processing Assessment with security challenges and puzzle endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8888",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Memory Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/memory-status",
+              "host": ["{{baseUrl}}"],
+              "path": ["memory-status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Metrics (Dev Only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Generate Test Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"test-user\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/test-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "test-token"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpass\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "verify"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Upload & Management",
+      "item": [
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "publicAccess",
+                  "value": "false",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Test file upload",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Files",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload?page=1&limit=20&status=processed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "processed"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get File Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update File Metadata",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicAccess\": true,\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "upload", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Puzzle Endpoints",
+      "item": [
+        {
+          "name": "Processing Logs - Basic Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/processing-logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "processing-logs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Processing Logs - Admin Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/processing-logs?access=PROC_LOGS_ADMIN_2024&level=detailed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "processing-logs"],
+              "query": [
+                {
+                  "key": "access",
+                  "value": "PROC_LOGS_ADMIN_2024"
+                },
+                {
+                  "key": "level",
+                  "value": "detailed"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Processing Logs - System Access",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-System-Key",
+                "value": "system-processing-key-2024"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/processing-logs?level=full",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "processing-logs"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "full"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archive - Basic Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/archive",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "archive"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archive - Master Access (Header)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Archive-Key",
+                "value": "ARCHIVE_MASTER_2024"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/archive",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "archive"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archive - Master Access (Query)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/archive?master_key=ARCHIVE_MASTER_2024",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "archive"],
+              "query": [
+                {
+                  "key": "master_key",
+                  "value": "ARCHIVE_MASTER_2024"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Sharing",
+      "item": [
+        {
+          "name": "Create Share Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileId\": \"file-001\",\n  \"expiresIn\": \"24h\",\n  \"maxDownloads\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/sharing/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sharing", "create"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Access Shared File",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/sharing/:shareToken",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sharing", ":shareToken"],
+              "variable": [
+                {
+                  "key": "shareToken",
+                  "value": "share-token-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List User Shares",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sharing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "sharing"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Versions",
+      "item": [
+        {
+          "name": "Get File Versions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "versions", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create New Version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "versionNote",
+                  "value": "Updated version",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "versions", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Version",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"versionId\": \"version-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/versions/:fileId/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "versions", ":fileId", "restore"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Batch Processing",
+      "item": [
+        {
+          "name": "Create Batch Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileIds\": [\"file-001\", \"file-002\"],\n  \"operation\": \"compress\",\n  \"options\": {\n    \"quality\": 80\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/batch",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "batch"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Batch Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/batch/:batchId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "batch", ":batchId"],
+              "variable": [
+                {
+                  "key": "batchId",
+                  "value": "batch-id-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List User Batches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/batch",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "batch"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Storage Quotas",
+      "item": [
+        {
+          "name": "Get User Quota",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotas",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotas"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Quota (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-id-here\",\n  \"newQuota\": 209715200\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/quotas/update",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotas", "update"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Virus Scanning",
+      "item": [
+        {
+          "name": "Scan File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileId\": \"file-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/virus-scan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "virus-scan"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Scan Results",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/virus-scan/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "virus-scan", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Panel",
+      "item": [
+        {
+          "name": "Get System Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Files (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/files?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "files"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Any File (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/files/:fileId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "files", ":fileId"],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "file-001"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "System Cleanup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/cleanup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "cleanup"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Queue Management",
+      "item": [
+        {
+          "name": "Get Queue Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/queue/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "queue", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/queue/job/:jobId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "queue", "job", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-id-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Retry Failed Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/queue/retry/:jobId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "queue", "retry", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "job-id-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set auth token from environment or previous requests",
+          "if (pm.environment.get('authToken')) {",
+          "    pm.variables.set('authToken', pm.environment.get('authToken'));",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-save auth tokens from login responses",
+          "if (pm.response.json() && pm.response.json().token) {",
+          "    pm.environment.set('authToken', pm.response.json().token);",
+          "    pm.variables.set('authToken', pm.response.json().token);",
+          "}",
+          "",
+          "// Log response for debugging",
+          "console.log('Response Status:', pm.response.status);",
+          "console.log('Response Body:', pm.response.text());"
+        ]
+      }
+    }
+  ]
+}

@@ -1,16 +1,10 @@
 const { logger } = require('./logger');
 const { AppError } = require('../middleware/errorHandler');
 
-/**
- * Comprehensive retry utility for handling transient failures
- * Supports exponential backoff, error categorization, and configurable retry strategies
- */
-
-// Default retry configuration
 const DEFAULT_RETRY_CONFIG = {
   maxRetries: 3,
-  initialDelay: 1000, // 1 second
-  maxDelay: 30000, // 30 seconds
+  initialDelay: 1000,
+  maxDelay: 30000,
   backoffMultiplier: 2,
   jitter: true,
   retryableErrors: [
@@ -28,19 +22,14 @@ const DEFAULT_RETRY_CONFIG = {
   ]
 };
 
-/**
- * Error categorization utility
- */
 class ErrorClassifier {
   static isRetryable(error, retryableErrors = DEFAULT_RETRY_CONFIG.retryableErrors) {
     if (!error) return false;
 
-    // Check error code
     if (error.code && retryableErrors.includes(error.code)) {
       return true;
     }
 
-    // Check error message patterns
     const message = error.message?.toLowerCase() || '';
     const retryablePatterns = [
       'timeout',
@@ -63,7 +52,6 @@ class ErrorClassifier {
   static isPermanent(error) {
     if (!error) return false;
 
-    // Check for permanent error codes
     const permanentCodes = [
       'ENOENT',
       'EACCES',
@@ -78,14 +66,11 @@ class ErrorClassifier {
       return true;
     }
 
-    // Check HTTP status codes
     if (error.statusCode || error.status) {
       const status = error.statusCode || error.status;
-      // Permanent errors: 400-499 (except 408, 429)
       return status >= 400 && status < 500 && status !== 408 && status !== 429;
     }
 
-    // Check error message patterns for permanent failures
     const message = error.message?.toLowerCase() || '';
     const permanentPatterns = [
       'invalid',
@@ -108,24 +93,17 @@ class ErrorClassifier {
   }
 }
 
-/**
- * Retry mechanism with exponential backoff
- */
 class RetryManager {
   constructor(config = {}) {
     this.config = { ...DEFAULT_RETRY_CONFIG, ...config };
     this.attemptHistory = [];
   }
 
-  /**
-   * Calculate delay for next retry attempt
-   */
   calculateDelay(attempt) {
     const baseDelay = this.config.initialDelay * Math.pow(this.config.backoffMultiplier, attempt);
     const cappedDelay = Math.min(baseDelay, this.config.maxDelay);
     
     if (this.config.jitter) {
-      // Add random jitter to prevent thundering herd
       const jitterRange = cappedDelay * 0.1;
       const jitter = (Math.random() - 0.5) * 2 * jitterRange;
       return Math.max(100, cappedDelay + jitter);
@@ -134,16 +112,10 @@ class RetryManager {
     return cappedDelay;
   }
 
-  /**
-   * Sleep for specified duration
-   */
   async sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Execute operation with retry logic
-   */
   async execute(operation, context = {}) {
     const { operationName = 'Unknown', ...operationContext } = context;
     const startTime = Date.now();
@@ -161,7 +133,6 @@ class RetryManager {
 
         const result = await operation();
         
-        // Success - log and return
         const totalDuration = Date.now() - startTime;
         const attemptDuration = Date.now() - attemptStartTime;
         
@@ -212,7 +183,6 @@ class RetryManager {
           context: operationContext
         });
 
-        // Check if error is permanent - don't retry
         if (ErrorClassifier.isPermanent(error)) {
           logger.error(`Permanent error detected, aborting retries for ${operationName}`, {
             operationName,
@@ -224,7 +194,6 @@ class RetryManager {
           throw error;
         }
 
-        // Check if error is retryable
         if (!ErrorClassifier.isRetryable(error) && errorCategory !== 'unknown') {
           logger.error(`Non-retryable error detected, aborting retries for ${operationName}`, {
             operationName,
@@ -236,7 +205,6 @@ class RetryManager {
           throw error;
         }
 
-        // Check if we've exhausted all retries
         if (attempt >= this.config.maxRetries) {
           const totalDuration = Date.now() - startTime;
           logger.error(`All retry attempts exhausted for ${operationName}`, {
@@ -248,7 +216,6 @@ class RetryManager {
             context: operationContext
           });
           
-          // Enhance error with retry information
           const enhancedError = new AppError(
             `Operation failed after ${attempt + 1} attempts: ${error.message}`,
             error.statusCode || 500,
@@ -262,7 +229,6 @@ class RetryManager {
           throw enhancedError;
         }
 
-        // Calculate delay for next attempt
         const delay = this.calculateDelay(attempt);
         logger.debug(`Waiting ${delay}ms before next retry attempt`, {
           operationName,
@@ -274,14 +240,9 @@ class RetryManager {
         await this.sleep(delay);
       }
     }
-
-    // This should never be reached, but just in case
     throw lastError;
   }
 
-  /**
-   * Get retry statistics
-   */
   getStats() {
     return {
       totalAttempts: this.attemptHistory.length,
@@ -295,11 +256,7 @@ class RetryManager {
   }
 }
 
-/**
- * Pre-configured retry managers for different operations
- */
 const retryManagers = {
-  // File upload operations - more aggressive retries
   fileUpload: new RetryManager({
     maxRetries: 5,
     initialDelay: 2000,
@@ -307,7 +264,6 @@ const retryManagers = {
     backoffMultiplier: 2
   }),
 
-  // File processing operations - moderate retries
   fileProcessing: new RetryManager({
     maxRetries: 3,
     initialDelay: 1000,
@@ -315,7 +271,6 @@ const retryManagers = {
     backoffMultiplier: 2
   }),
 
-  // Network operations - quick retries
   network: new RetryManager({
     maxRetries: 4,
     initialDelay: 500,
@@ -323,7 +278,6 @@ const retryManagers = {
     backoffMultiplier: 1.5
   }),
 
-  // Database operations - conservative retries
   database: new RetryManager({
     maxRetries: 2,
     initialDelay: 1000,
@@ -331,7 +285,6 @@ const retryManagers = {
     backoffMultiplier: 2
   }),
 
-  // External API calls - balanced retries
   externalApi: new RetryManager({
     maxRetries: 3,
     initialDelay: 1500,
@@ -340,13 +293,7 @@ const retryManagers = {
   })
 };
 
-/**
- * Convenience functions for common retry patterns
- */
 const retryOperations = {
-  /**
-   * Retry file upload operation
-   */
   async fileUpload(operation, context = {}) {
     return retryManagers.fileUpload.execute(operation, {
       operationName: 'File Upload',
@@ -354,9 +301,6 @@ const retryOperations = {
     });
   },
 
-  /**
-   * Retry file processing operation
-   */
   async fileProcessing(operation, context = {}) {
     return retryManagers.fileProcessing.execute(operation, {
       operationName: 'File Processing',
@@ -364,9 +308,6 @@ const retryOperations = {
     });
   },
 
-  /**
-   * Retry network operation
-   */
   async network(operation, context = {}) {
     return retryManagers.network.execute(operation, {
       operationName: 'Network Operation',
@@ -374,9 +315,6 @@ const retryOperations = {
     });
   },
 
-  /**
-   * Retry database operation
-   */
   async database(operation, context = {}) {
     return retryManagers.database.execute(operation, {
       operationName: 'Database Operation',
@@ -384,9 +322,6 @@ const retryOperations = {
     });
   },
 
-  /**
-   * Retry external API call
-   */
   async externalApi(operation, context = {}) {
     return retryManagers.externalApi.execute(operation, {
       operationName: 'External API Call',

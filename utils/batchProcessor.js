@@ -6,17 +6,8 @@ const { processFile, enhancedProcessingTracker } = require('./enhancedFileProces
 const { retryOperations } = require('./retryManager');
 const { queueManager, JOB_TYPES, JOB_PRIORITIES } = require('./jobQueue');
 
-/**
- * Batch Processing System
- * Handles multiple file uploads and processing
- */
-
-// In-memory storage for batch jobs (use database/queue in production)
 const batchJobs = new Map();
 
-/**
- * Create a new batch processing job
- */
 async function createBatchJob(files, userId, options = {}) {
   try {
     const batchId = uuidv4();
@@ -80,9 +71,6 @@ async function createBatchJob(files, userId, options = {}) {
   }
 }
 
-/**
- * Start processing a batch job
- */
 async function startBatchProcessing(batchId) {
   try {
     const batchJob = batchJobs.get(batchId);
@@ -109,7 +97,6 @@ async function startBatchProcessing(batchId) {
       await processBatchSequentially(batchJob);
     }
     
-    // Mark batch as completed
     batchJob.status = batchJob.failedFiles > 0 ? 'completed_with_errors' : 'completed';
     batchJob.completedAt = new Date().toISOString();
     batchJob.progress = 100;
@@ -142,9 +129,6 @@ async function startBatchProcessing(batchId) {
   }
 }
 
-/**
- * Process batch files in parallel
- */
 async function processBatchInParallel(batchJob) {
   const { files, maxConcurrency } = batchJob;
   const semaphore = new Semaphore(maxConcurrency);
@@ -161,9 +145,6 @@ async function processBatchInParallel(batchJob) {
   await Promise.all(promises);
 }
 
-/**
- * Process batch files sequentially
- */
 async function processBatchSequentially(batchJob) {
   const { files } = batchJob;
   
@@ -172,15 +153,11 @@ async function processBatchSequentially(batchJob) {
   }
 }
 
-/**
- * Process a single file within a batch
- */
 async function processSingleFileInBatch(batchJob, file) {
   try {
     file.status = 'processing';
     updateBatchProgress(batchJob);
     
-    // Validate file
     await validateFile({
       originalname: file.originalName,
       mimetype: file.mimetype,
@@ -188,14 +165,12 @@ async function processSingleFileInBatch(batchJob, file) {
       buffer: file.buffer
     });
     
-    // Upload to storage
     const storageResult = await saveFile(file.buffer, file.originalName, file.mimetype);
     
     file.fileId = uuidv4();
     file.publicId = storageResult.publicId;
     file.secureUrl = storageResult.secureUrl;
     
-    // Process file
     const processingResult = await processFile({
       id: file.fileId,
       originalName: file.originalName,
@@ -248,16 +223,10 @@ async function processSingleFileInBatch(batchJob, file) {
   }
 }
 
-/**
- * Update batch processing progress
- */
 function updateBatchProgress(batchJob) {
   batchJob.progress = Math.round((batchJob.processedFiles / batchJob.totalFiles) * 100);
 }
 
-/**
- * Get batch job status
- */
 function getBatchJob(batchId, userId, userRole) {
   const batchJob = batchJobs.get(batchId);
   
@@ -265,12 +234,10 @@ function getBatchJob(batchId, userId, userRole) {
     return null;
   }
   
-  // Check access control
   if (batchJob.userId !== userId && userRole !== 'admin') {
     return null;
   }
   
-  // Return sanitized batch job data
   return {
     batchId: batchJob.batchId,
     userId: batchJob.userId,
@@ -296,9 +263,6 @@ function getBatchJob(batchId, userId, userRole) {
   };
 }
 
-/**
- * Get user's batch jobs
- */
 function getUserBatchJobs(userId, userRole) {
   const userJobs = [];
   
@@ -320,9 +284,6 @@ function getUserBatchJobs(userId, userRole) {
   return userJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
-/**
- * Cancel a batch job
- */
 function cancelBatchJob(batchId, userId, userRole) {
   const batchJob = batchJobs.get(batchId);
   
@@ -330,7 +291,6 @@ function cancelBatchJob(batchId, userId, userRole) {
     throw new Error('Batch job not found');
   }
   
-  // Check access control
   if (batchJob.userId !== userId && userRole !== 'admin') {
     throw new Error('Access denied');
   }
@@ -352,9 +312,6 @@ function cancelBatchJob(batchId, userId, userRole) {
   return batchJob;
 }
 
-/**
- * Delete a batch job
- */
 function deleteBatchJob(batchId, userId, userRole) {
   const batchJob = batchJobs.get(batchId);
   
@@ -362,7 +319,6 @@ function deleteBatchJob(batchId, userId, userRole) {
     throw new Error('Batch job not found');
   }
   
-  // Check access control
   if (batchJob.userId !== userId && userRole !== 'admin') {
     throw new Error('Access denied');
   }
@@ -377,9 +333,6 @@ function deleteBatchJob(batchId, userId, userRole) {
   return true;
 }
 
-/**
- * Semaphore for controlling concurrency
- */
 class Semaphore {
   constructor(maxConcurrency) {
     this.maxConcurrency = maxConcurrency;
@@ -408,9 +361,6 @@ class Semaphore {
   }
 }
 
-/**
- * Get batch processing statistics
- */
 function getBatchStats(userId, userRole) {
   let totalJobs = 0;
   let completedJobs = 0;
