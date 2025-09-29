@@ -16,27 +16,22 @@ class HealthMonitor {
     this.startHealthChecks();
   }
 
-  // Increment request counter
   recordRequest() {
     this.metrics.requests++;
   }
 
-  // Increment error counter
   recordError() {
     this.metrics.errors++;
   }
 
-  // Increment upload counter
   recordUpload() {
     this.metrics.uploads++;
   }
 
-  // Record processing job
   recordProcessingJob() {
     this.metrics.processingJobs++;
   }
 
-  // Get current health status
   getHealthStatus() {
     const memUsage = process.memoryUsage();
     const uptime = process.uptime();
@@ -63,7 +58,6 @@ class HealthMonitor {
     };
   }
 
-  // Start periodic health checks
   startHealthChecks() {
     if (!config.monitoring.metricsEnabled) return;
 
@@ -72,30 +66,25 @@ class HealthMonitor {
     }, config.monitoring.healthCheckInterval);
   }
 
-  // Perform health check
   performHealthCheck() {
     const memUsage = process.memoryUsage();
     const heapUsedMB = memUsage.heapUsed / 1024 / 1024;
     
-    // Update metrics
     this.metrics.memoryUsage = memUsage;
     this.metrics.lastHealthCheck = new Date().toISOString();
     
-    // Log warnings for high memory usage
-    if (heapUsedMB > 500) { // 500MB threshold
+    if (heapUsedMB > 500) {
       logger.warn('High memory usage detected', {
         heapUsed: `${Math.round(heapUsedMB)}MB`,
         heapTotal: `${Math.round(memUsage.heapTotal / 1024 / 1024)}MB`
       });
     }
     
-    // Log health status periodically
     if (config.server.isDevelopment) {
       logger.info('Health check', this.getHealthStatus());
     }
   }
 
-  // Get detailed metrics
   getMetrics() {
     return {
       ...this.metrics,
@@ -107,16 +96,14 @@ class HealthMonitor {
   }
 }
 
-// Performance monitoring middleware
 const performanceMonitor = (req, res, next) => {
   const start = process.hrtime.bigint();
   
   res.on('finish', () => {
     const end = process.hrtime.bigint();
-    const duration = Number(end - start) / 1000000; // Convert to milliseconds
+    const duration = Number(end - start) / 1000000;
     
-    // Log slow requests
-    if (duration > 1000) { // 1 second threshold
+    if (duration > 1000) {
       logger.warn('Slow request detected', {
         method: req.method,
         url: req.url,
@@ -125,8 +112,7 @@ const performanceMonitor = (req, res, next) => {
       });
     }
     
-    // Record metrics
-    healthMonitor.recordRequest();
+    healthMonitor.rec;uest()ordReq
     if (res.statusCode >= 400) {
       healthMonitor.recordError();
     }
@@ -138,28 +124,22 @@ const performanceMonitor = (req, res, next) => {
   next();
 };
 
-// Create global health monitor instance
 const healthMonitor = new HealthMonitor();
 
-// Graceful shutdown handler
 const gracefulShutdown = (signal) => {
   logger.info(`Received ${signal}, starting graceful shutdown`);
   
-  // Stop accepting new requests
   process.exit(0);
 };
 
-// Register shutdown handlers
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception', { error: error.message, stack: error.stack });
   process.exit(1);
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled promise rejection', { reason, promise });
   process.exit(1);

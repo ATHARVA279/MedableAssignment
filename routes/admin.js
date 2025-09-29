@@ -10,7 +10,6 @@ const { inputSanitizer } = require("../utils/inputSanitizer");
 
 const router = express.Router();
 
-// Admin authentication middleware
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== "admin") {
     return res.status(403).json({ error: "Admin access required" });
@@ -18,7 +17,6 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Get access logs - ADMIN ONLY
 router.get(
   "/access-logs",
   authenticateToken,
@@ -46,7 +44,6 @@ router.get(
     } else if (userId) {
       logs = accessLogger.getUserActivityLogs(userId, limitNum);
     } else {
-      // Get system-wide statistics
       const stats = accessLogger.getAccessStatistics(timeRange);
       return res.json({
         statistics: stats,
@@ -62,7 +59,6 @@ router.get(
   })
 );
 
-// Export access logs - ADMIN ONLY
 router.get(
   "/access-logs/export",
   authenticateToken,
@@ -99,7 +95,6 @@ router.get(
   })
 );
 
-// Get memory statistics - ADMIN ONLY
 router.get(
   "/memory-stats",
   authenticateToken,
@@ -116,7 +111,6 @@ router.get(
   })
 );
 
-// Update memory limits - ADMIN ONLY
 router.put(
   "/memory-limits",
   authenticateToken,
@@ -170,7 +164,6 @@ router.put(
   })
 );
 
-// Get virus scanner status - ADMIN ONLY
 router.get(
   "/virus-scanner/status",
   authenticateToken,
@@ -185,7 +178,6 @@ router.get(
   })
 );
 
-// Test virus scanner - ADMIN ONLY
 router.post(
   "/virus-scanner/test",
   authenticateToken,
@@ -204,7 +196,6 @@ router.post(
   })
 );
 
-// Create backup - ADMIN ONLY
 router.post(
   "/backup/create",
   authenticateToken,
@@ -235,7 +226,6 @@ router.post(
   })
 );
 
-// List backups - ADMIN ONLY
 router.get(
   "/backup/list",
   authenticateToken,
@@ -251,7 +241,6 @@ router.get(
   })
 );
 
-// Restore from backup - ADMIN ONLY
 router.post(
   "/backup/restore/:backupId",
   authenticateToken,
@@ -275,7 +264,6 @@ router.post(
   })
 );
 
-// Get network timeout statistics - ADMIN ONLY
 router.get(
   "/network/timeout-stats",
   authenticateToken,
@@ -293,7 +281,6 @@ router.get(
   })
 );
 
-// Update timeout settings - ADMIN ONLY
 router.put(
   "/network/timeout-settings",
   authenticateToken,
@@ -343,7 +330,6 @@ router.put(
   })
 );
 
-// Get input sanitizer statistics - ADMIN ONLY
 router.get(
   "/security/sanitizer-stats",
   authenticateToken,
@@ -358,7 +344,6 @@ router.get(
   })
 );
 
-// System health check - ADMIN ONLY
 router.get(
   "/health/detailed",
   authenticateToken,
@@ -402,10 +387,9 @@ router.get(
         failedSessions: activeSessions.filter((s) => s.status === "failed")
           .length,
       },
-      overall: "healthy", // This would be calculated based on individual component health
+      overall: "healthy", 
     };
 
-    // Determine overall health
     const componentStatuses = [
       health.memory.status,
       health.virusScanner.status,

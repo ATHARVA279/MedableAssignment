@@ -20,11 +20,11 @@ const AdminPanel = () => {
   const formatBytes = (bytes) => {
     if (bytes === 0) return '0 Bytes'
     if (!bytes || bytes < 0) return '0 Bytes'
-    
+
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
@@ -45,34 +45,30 @@ const AdminPanel = () => {
     try {
       const response = await apiClient.get('/api/admin/memory-stats')
       const { currentStats, report } = response.data || {}
-      
-      // Transform the memory stats into the expected format for the UI
+
       const transformedStats = []
-      
+
       if (currentStats) {
-        // System Memory
         if (currentStats.system && typeof currentStats.system.percentage === 'number') {
           transformedStats.push({
             name: 'System Memory',
-            status: currentStats.system.percentage > 90 ? 'error' : 
-                   currentStats.system.percentage > 80 ? 'warning' : 'healthy',
+            status: currentStats.system.percentage > 90 ? 'error' :
+              currentStats.system.percentage > 80 ? 'warning' : 'healthy',
             usage: `${currentStats.system.percentage.toFixed(1)}%`,
             description: `${formatBytes(currentStats.system.used || 0)} / ${formatBytes(currentStats.system.total || 0)}`
           })
         }
-        
-        // Heap Memory
+
         if (currentStats.heap && typeof currentStats.heap.percentage === 'number') {
           transformedStats.push({
             name: 'Heap Memory',
-            status: currentStats.heap.percentage > 90 ? 'error' : 
-                   currentStats.heap.percentage > 80 ? 'warning' : 'healthy',
+            status: currentStats.heap.percentage > 90 ? 'error' :
+              currentStats.heap.percentage > 80 ? 'warning' : 'healthy',
             usage: `${currentStats.heap.percentage.toFixed(1)}%`,
             description: `${formatBytes(currentStats.heap.used || 0)} / ${formatBytes(currentStats.heap.total || 0)}`
           })
         }
-        
-        // Active Uploads
+
         if (report?.summary && typeof report.summary.activeUploads === 'number') {
           transformedStats.push({
             name: 'Active Uploads',
@@ -81,22 +77,20 @@ const AdminPanel = () => {
             description: `Memory: ${report.summary.totalUploadMemory || '0 Bytes'}`
           })
         }
-        
-        // Upload Memory Usage
+
         if (currentStats.limits && currentStats.limits.maxTotalMemoryUsage) {
           const current = currentStats.current || 0
           const uploadMemoryPercent = (current / currentStats.limits.maxTotalMemoryUsage) * 100
           transformedStats.push({
             name: 'Upload Memory',
-            status: uploadMemoryPercent > 90 ? 'error' : 
-                   uploadMemoryPercent > 80 ? 'warning' : 'healthy',
+            status: uploadMemoryPercent > 90 ? 'error' :
+              uploadMemoryPercent > 80 ? 'warning' : 'healthy',
             usage: `${uploadMemoryPercent.toFixed(1)}%`,
             description: `${formatBytes(current)} / ${formatBytes(currentStats.limits.maxTotalMemoryUsage)}`
           })
         }
       }
-      
-      // If no stats were found, add a default message
+
       if (transformedStats.length === 0) {
         transformedStats.push({
           name: 'Memory Monitor',
@@ -105,11 +99,10 @@ const AdminPanel = () => {
           description: 'Memory statistics not available'
         })
       }
-      
+
       setMemoryStats(transformedStats)
     } catch (error) {
       toast.error(`Failed to load memory stats: ${error.response?.data?.error || error.message}`)
-      // Set an error state so the UI doesn't crash
       setMemoryStats([{
         name: 'Memory Monitor',
         status: 'error',
@@ -193,7 +186,6 @@ const AdminPanel = () => {
         </p>
       </div>
 
-      {/* System Health Overview */}
       {systemHealth && (
         <div className="card">
           <div className="card-header">
@@ -206,7 +198,6 @@ const AdminPanel = () => {
           </div>
 
           <div className="grid-4">
-            {/* Memory */}
             <div className="card-item">
               <div className="item-header">
                 <h3>Memory</h3>
@@ -218,7 +209,6 @@ const AdminPanel = () => {
               <div className="item-desc">{systemHealth.memory.activeUploads} active uploads</div>
             </div>
 
-            {/* Virus Scanner */}
             <div className="card-item">
               <div className="item-header">
                 <h3>Virus Scanner</h3>
@@ -229,7 +219,6 @@ const AdminPanel = () => {
               <div className="item-desc">Available: {systemHealth.virusScanner.availableScanners.join(', ')}</div>
             </div>
 
-            {/* Backup */}
             <div className="card-item">
               <div className="item-header">
                 <h3>Backup</h3>
@@ -245,7 +234,6 @@ const AdminPanel = () => {
               </div>
             </div>
 
-            {/* Network */}
             <div className="card-item">
               <div className="item-header">
                 <h3>Network</h3>
@@ -262,7 +250,6 @@ const AdminPanel = () => {
         </div>
       )}
 
-      {/* Memory Stats */}
       {memoryStats && Array.isArray(memoryStats) && memoryStats.length > 0 && (
         <div className="card">
           <div className="card-header">
@@ -285,7 +272,6 @@ const AdminPanel = () => {
         </div>
       )}
 
-      {/* Access Logs */}
       {accessLogs.length > 0 && (
         <div className="card">
           <div className="card-header">
@@ -304,7 +290,6 @@ const AdminPanel = () => {
         </div>
       )}
 
-      {/* Admin Actions */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title"><i className="fas fa-tools"></i> Admin Actions</h2>
@@ -325,7 +310,6 @@ const AdminPanel = () => {
         </div>
       </div>
 
-      {/* Admin Warning */}
       {systemHealth?.warning && (
         <div className="card card-warning">
           <h3><i className="fas fa-exclamation-circle"></i> Warning</h3>

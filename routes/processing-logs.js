@@ -1,6 +1,3 @@
-// SECRET PROCESSING LOGS ENDPOINT - Discovered through header hint
-// Header hint: "check_file_processing_logs_endpoint"
-
 const express = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -9,7 +6,6 @@ const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-// Mock processing logs with sensitive information
 const processingLogs = [
   {
     id: 'log-001',
@@ -53,7 +49,7 @@ const JWT_SECRET = 'file-upload-secret-2024';
 const ADMIN_ACCESS_CODE = 'PROC_LOGS_ADMIN_2024';
 const SYSTEM_API_KEY = 'system-processing-key-2024';
 
-// Get processing logs
+// Get processing logs - PUZZLE ENDPOINT (optional auth for puzzle solving)
 router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     // Multiple access methods for the puzzle
     const authHeader = req.get('authorization');
@@ -75,7 +71,7 @@ router.get('/', optionalAuth, asyncHandler(async (req, res) => {
       hasAccess = true;
       accessLevel = 'admin';
     }
-    // Method 3: JWT Token (limited access)
+    // Method 3: JWT Token (limited access) - use middleware parsed user
     else if (req.user) {
       currentUser = req.user;
       hasAccess = true;

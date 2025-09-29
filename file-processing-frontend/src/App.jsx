@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
-// Components
 import Header from './components/Header'
 import Navigation from './components/Navigation'
 import Dashboard from './pages/Dashboard'
@@ -13,7 +12,6 @@ import FileSharing from './pages/FileSharing'
 import StorageQuotas from './pages/StorageQuotas'
 import AdminPanel from './pages/AdminPanel'
 
-// Services
 import { authService } from './services/authService'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 

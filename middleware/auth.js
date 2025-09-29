@@ -2,7 +2,6 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'file-upload-secret-2024';
 
-// Authentication middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.get('authorization');
   
@@ -25,7 +24,6 @@ function authenticateToken(req, res, next) {
   }
 }
 
-// Optional authentication middleware (for puzzle endpoints)
 function optionalAuth(req, res, next) {
   const authHeader = req.get('authorization');
   
@@ -37,7 +35,6 @@ function optionalAuth(req, res, next) {
         req.user = user;
       }
     } catch (error) {
-      // Silent failure for optional auth
       console.log('Optional auth failed:', error.message);
     }
   }
@@ -45,7 +42,6 @@ function optionalAuth(req, res, next) {
   next();
 }
 
-// Generate test token for development
 function generateTestToken(userId = 'test-user', role = 'user') {
   return jwt.sign({ userId, role }, JWT_SECRET, { expiresIn: '24h' });
 }

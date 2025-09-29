@@ -63,7 +63,6 @@ const Header = () => {
         </div>
       </header>
 
-      {/* Login Modal */}
       {showLoginModal && (
         <div className="modal-overlay">
           <div className="modal">

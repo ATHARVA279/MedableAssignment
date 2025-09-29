@@ -49,7 +49,6 @@ const Dashboard = () => {
   return (
     <div className="space-y-8">
 
-      {/* Welcome Section */}
       <div className="card text-center">
         <div className="avatar mx-auto mb-6">
           <i className="fas fa-cloud-upload-alt text-white text-3xl"></i>
@@ -69,7 +68,6 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* System Status */}
       {user && (
         <div className="card">
           <div className="card-header">
@@ -96,7 +94,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Quick Actions */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title"><i className="fas fa-rocket"></i> Quick Actions</h2>
@@ -109,7 +106,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Platform Features */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title"><i className="fas fa-star"></i> Platform Features</h2>
@@ -121,7 +117,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* User Info */}
       {user && (
         <div className="card">
           <div className="card-header">
@@ -138,7 +133,6 @@ const Dashboard = () => {
   )
 }
 
-// ---------------------- Subcomponents ----------------------
 const StatCard = ({ title, value, icon, color }) => (
   <div className={`bg-${color}-50 p-4 rounded-lg border border-${color}-200`}>
     <div className="flex items-center justify-between">

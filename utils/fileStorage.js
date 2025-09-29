@@ -1,58 +1,54 @@
-const config = require('../config');
-const { logger } = require('./logger');
+const config = require("../config");
+const { logger } = require("./logger");
 
-// Import storage implementations
-const cloudinaryStorage = require('./cloudinaryStorage');
+const cloudinaryStorage = require("./cloudinaryStorage");
 
-/**
- * Save file using configured storage provider
- */
 async function saveFile(fileBuffer, originalName, mimetype, options = {}) {
   try {
-    if (config.storage.type === 'cloudinary') {
-      return await cloudinaryStorage.uploadToCloudinary(fileBuffer, originalName, mimetype, options);
+    if (config.storage.type === "cloudinary") {
+      return await cloudinaryStorage.uploadToCloudinary(
+        fileBuffer,
+        originalName,
+        mimetype,
+        options
+      );
     } else {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    logger.error('File save failed', {
+    logger.error("File save failed", {
       error: error.message,
       originalName,
       mimetype,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     throw error;
   }
 }
 
-/**
- * Delete file using configured storage provider
- */
-async function deleteFile(fileIdentifier, resourceType = 'auto') {
+async function deleteFile(fileIdentifier, resourceType = "auto") {
   try {
-    if (config.storage.type === 'cloudinary') {
-      // For Cloudinary, fileIdentifier is the publicId
-      return await cloudinaryStorage.deleteFromCloudinary(fileIdentifier, resourceType);
+    if (config.storage.type === "cloudinary") {
+      return await cloudinaryStorage.deleteFromCloudinary(
+        fileIdentifier,
+        resourceType
+      );
     } else {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    logger.error('File deletion failed', {
+    logger.error("File deletion failed", {
       error: error.message,
       fileIdentifier,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     throw error;
   }
 }
 
-/**
- * Check if file exists using configured storage provider
- */
-async function fileExists(fileIdentifier, resourceType = 'auto') {
+async function fileExists(fileIdentifier, resourceType = "auto") {
   try {
-    if (config.storage.type === 'cloudinary') {
-      // For Cloudinary, try to get metadata to check existence
+    if (config.storage.type === "cloudinary") {
       await cloudinaryStorage.getFileMetadata(fileIdentifier, resourceType);
       return true;
     } else {
@@ -63,119 +59,122 @@ async function fileExists(fileIdentifier, resourceType = 'auto') {
   }
 }
 
-/**
- * Get file metadata using configured storage provider
- */
-async function getFileStats(fileIdentifier, resourceType = 'auto') {
+async function getFileStats(fileIdentifier, resourceType = "auto") {
   try {
-    if (config.storage.type === 'cloudinary') {
-      return await cloudinaryStorage.getFileMetadata(fileIdentifier, resourceType);
+    if (config.storage.type === "cloudinary") {
+      return await cloudinaryStorage.getFileMetadata(
+        fileIdentifier,
+        resourceType
+      );
     } else {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    logger.error('Failed to get file stats', {
+    logger.error("Failed to get file stats", {
       error: error.message,
       fileIdentifier,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     throw error;
   }
 }
 
-/**
- * Generate thumbnail URL
- */
 function generateThumbnailUrl(fileIdentifier, options = {}) {
-  if (config.storage.type === 'cloudinary') {
+  if (config.storage.type === "cloudinary") {
     return cloudinaryStorage.generateThumbnailUrl(fileIdentifier, options);
   } else {
-    throw new Error(`Thumbnail generation not supported for storage type: ${config.storage.type}`);
+    throw new Error(
+      `Thumbnail generation not supported for storage type: ${config.storage.type}`
+    );
   }
 }
 
-/**
- * Generate optimized file URL
- */
-function generateOptimizedUrl(fileIdentifier, resourceType = 'auto', options = {}) {
-  if (config.storage.type === 'cloudinary') {
-    return cloudinaryStorage.generateOptimizedUrl(fileIdentifier, resourceType, options);
+function generateOptimizedUrl(
+  fileIdentifier,
+  resourceType = "auto",
+  options = {}
+) {
+  if (config.storage.type === "cloudinary") {
+    return cloudinaryStorage.generateOptimizedUrl(
+      fileIdentifier,
+      resourceType,
+      options
+    );
   } else {
-    throw new Error(`URL optimization not supported for storage type: ${config.storage.type}`);
+    throw new Error(
+      `URL optimization not supported for storage type: ${config.storage.type}`
+    );
   }
 }
 
-/**
- * Test storage connection
- */
 async function testStorageConnection() {
   try {
-    if (config.storage.type === 'cloudinary') {
+    if (config.storage.type === "cloudinary") {
       return await cloudinaryStorage.testCloudinaryConnection();
     } else {
-      throw new Error(`Storage connection test not implemented for: ${config.storage.type}`);
+      throw new Error(
+        `Storage connection test not implemented for: ${config.storage.type}`
+      );
     }
   } catch (error) {
-    logger.error('Storage connection test failed', {
+    logger.error("Storage connection test failed", {
       error: error.message,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     return false;
   }
 }
 
-/**
- * Clean up old files (implementation depends on storage type)
- */
 async function cleanupOldFiles() {
   try {
-    logger.info('Cleanup operation called', { storageType: config.storage.type });
-    
-    if (config.storage.type === 'cloudinary') {
-      // For Cloudinary, cleanup would typically be handled by their auto-cleanup features
-      // or through their API for bulk operations
-      logger.info('Cloudinary cleanup: Using Cloudinary auto-cleanup features');
+    logger.info("Cleanup operation called", {
+      storageType: config.storage.type,
+    });
+
+    if (config.storage.type === "cloudinary") {
+      logger.info("Cloudinary cleanup: Using Cloudinary auto-cleanup features");
       return true;
     } else {
-      logger.warn('Cleanup not implemented for storage type', { storageType: config.storage.type });
+      logger.warn("Cleanup not implemented for storage type", {
+        storageType: config.storage.type,
+      });
       return false;
     }
   } catch (error) {
-    logger.error('Cleanup operation failed', {
+    logger.error("Cleanup operation failed", {
       error: error.message,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     return false;
   }
 }
 
-/**
- * Initialize storage system
- */
 async function initializeStorage() {
   try {
-    logger.info('Initializing storage system', { storageType: config.storage.type });
-    
-    if (config.storage.type === 'cloudinary') {
+    logger.info("Initializing storage system", {
+      storageType: config.storage.type,
+    });
+
+    if (config.storage.type === "cloudinary") {
       const isConfigured = cloudinaryStorage.isCloudinaryConfigured();
       if (!isConfigured) {
-        throw new Error('Cloudinary credentials not configured');
+        throw new Error("Cloudinary credentials not configured");
       }
-      
+
       const connectionTest = await cloudinaryStorage.testCloudinaryConnection();
       if (!connectionTest) {
-        throw new Error('Cloudinary connection test failed');
+        throw new Error("Cloudinary connection test failed");
       }
-      
-      logger.info('Cloudinary storage initialized successfully');
+
+      logger.info("Cloudinary storage initialized successfully");
       return true;
     } else {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    logger.error('Storage initialization failed', {
+    logger.error("Storage initialization failed", {
       error: error.message,
-      storageType: config.storage.type
+      storageType: config.storage.type,
     });
     throw error;
   }
@@ -190,5 +189,5 @@ module.exports = {
   generateOptimizedUrl,
   testStorageConnection,
   cleanupOldFiles,
-  initializeStorage
+  initializeStorage,
 };

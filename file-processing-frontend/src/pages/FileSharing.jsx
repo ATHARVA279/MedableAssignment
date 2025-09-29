@@ -4,7 +4,9 @@ import toast from 'react-hot-toast'
 
 const FileSharing = () => {
   const [shareLinks, setShareLinks] = useState([])
+  const [userFiles, setUserFiles] = useState([])
   const [loading, setLoading] = useState(false)
+  const [loadingFiles, setLoadingFiles] = useState(false)
   const [createForm, setCreateForm] = useState({
     fileId: '',
     expiresIn: '24h',
@@ -15,7 +17,20 @@ const FileSharing = () => {
 
   useEffect(() => {
     loadShareLinks()
+    loadUserFiles()
   }, [])
+
+  const loadUserFiles = async () => {
+    setLoadingFiles(true)
+    try {
+      const response = await apiClient.get('/api/sharing/files')
+      setUserFiles(response.data.files || [])
+    } catch (error) {
+      console.error('Failed to load user files:', error)
+    } finally {
+      setLoadingFiles(false)
+    }
+  }
 
   const loadShareLinks = async () => {
     try {
@@ -39,12 +54,12 @@ const FileSharing = () => {
         expiresIn: createForm.expiresIn,
         allowPreview: createForm.allowPreview
       }
-      
+
       if (createForm.password) payload.password = createForm.password
       if (createForm.maxDownloads) payload.maxDownloads = parseInt(createForm.maxDownloads)
 
       const response = await apiClient.post(`/api/sharing/${createForm.fileId}`, payload)
-      
+
       toast.success('Share link created successfully!')
       setCreateForm({
         fileId: '',
@@ -90,12 +105,30 @@ const FileSharing = () => {
             File Sharing
           </h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-gray-600 mb-4">
           Create secure share links for your files with expiration dates, passwords, and download limits.
         </p>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-medium text-blue-800 mb-2">
+            <i className="fas fa-info-circle"></i> Link Types Explained
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <h4 className="font-medium text-blue-700">Share Link (Tracked)</h4>
+              <p className="text-blue-600">
+                Goes through our server, tracks downloads, enforces limits and passwords
+              </p>
+            </div>
+            <div>
+              <h4 className="font-medium text-green-700">Direct Download Link</h4>
+              <p className="text-green-600">
+                Downloads directly from Cloudinary, bypasses tracking but works offline
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Create Share Link */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
@@ -103,21 +136,31 @@ const FileSharing = () => {
             Create Share Link
           </h2>
         </div>
-        
+
         <form onSubmit={createShareLink} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
-              <label className="form-label">File ID *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Enter file ID to share"
+              <label className="form-label">Select File to Share *</label>
+              <select
+                className="form-select"
                 value={createForm.fileId}
                 onChange={(e) => setCreateForm(prev => ({ ...prev, fileId: e.target.value }))}
                 required
-              />
+              >
+                <option value="">Choose a file to share...</option>
+                {userFiles.map((file) => (
+                  <option key={file.fileId} value={file.fileId}>
+                    {file.fileName} ({(file.fileSize / 1024 / 1024).toFixed(2)} MB)
+                  </option>
+                ))}
+              </select>
+              {loadingFiles && (
+                <p className="text-sm text-gray-500 mt-1">
+                  <i className="fas fa-spinner fa-spin"></i> Loading your files...
+                </p>
+              )}
             </div>
-            
+
             <div className="form-group">
               <label className="form-label">Expires In</label>
               <select
@@ -131,7 +174,7 @@ const FileSharing = () => {
                 <option value="30d">30 Days</option>
               </select>
             </div>
-            
+
             <div className="form-group">
               <label className="form-label">Password (Optional)</label>
               <input
@@ -142,7 +185,7 @@ const FileSharing = () => {
                 onChange={(e) => setCreateForm(prev => ({ ...prev, password: e.target.value }))}
               />
             </div>
-            
+
             <div className="form-group">
               <label className="form-label">Max Downloads (Optional)</label>
               <input
@@ -155,7 +198,7 @@ const FileSharing = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -168,7 +211,7 @@ const FileSharing = () => {
               Allow file preview
             </label>
           </div>
-          
+
           <button
             type="submit"
             disabled={loading}
@@ -180,7 +223,6 @@ const FileSharing = () => {
         </form>
       </div>
 
-      {/* Share Links List */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
@@ -212,18 +254,53 @@ const FileSharing = () => {
                   </span>
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg mb-3">
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-sm bg-white p-2 rounded border">
-                      {window.location.origin}/api/sharing/download/{link.token}
-                    </code>
-                    <button
-                      onClick={() => copyToClipboard(`${window.location.origin}/api/sharing/download/${link.token}`)}
-                      className="btn btn-sm btn-outline"
-                    >
-                      <i className="fas fa-copy"></i>
-                    </button>
+                <div className="bg-gray-50 p-3 rounded-lg mb-3 space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-600 font-medium">Share Link (with tracking):</label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-sm bg-white p-2 rounded border">
+                        {window.location.origin}/api/sharing/download/{link.token}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(`${window.location.origin}/api/sharing/download/${link.token}`)}
+                        className="btn btn-sm btn-outline"
+                      >
+                        <i className="fas fa-copy"></i>
+                      </button>
+                    </div>
                   </div>
+                  {link.directUrl && (
+                    <div>
+                      <label className="text-xs text-gray-600 font-medium">
+                        Direct Download Link {link.mimetype === 'application/pdf' ? '(PDF Download)' : ''}:
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-sm bg-green-50 p-2 rounded border border-green-200">
+                          {link.directUrl}
+                        </code>
+                        <button
+                          onClick={() => copyToClipboard(link.directUrl)}
+                          className="btn btn-sm btn-success"
+                          title="Copy direct download link"
+                        >
+                          <i className="fas fa-copy"></i>
+                        </button>
+                        <a
+                          href={link.directUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm btn-primary"
+                          title="Download file directly"
+                        >
+                          <i className="fas fa-download"></i>
+                        </a>
+                      </div>
+                      <p className="text-xs text-green-600 mt-1">
+                        <i className="fas fa-check-circle"></i>
+                        This link will download the file directly to your computer
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
@@ -253,14 +330,34 @@ const FileSharing = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={() => copyToClipboard(`${window.location.origin}/api/sharing/download/${link.token}`)}
-                    className="btn btn-sm btn-primary"
+                    className="btn btn-sm btn-outline"
                   >
                     <i className="fas fa-copy"></i>
-                    Copy Link
+                    Copy Share Link
                   </button>
+                  {link.directUrl && (
+                    <>
+                      <button
+                        onClick={() => copyToClipboard(link.directUrl)}
+                        className="btn btn-sm btn-primary"
+                      >
+                        <i className="fas fa-link"></i>
+                        Copy Direct Link
+                      </button>
+                      <a
+                        href={link.directUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-sm btn-success"
+                      >
+                        <i className="fas fa-download"></i>
+                        Download Now
+                      </a>
+                    </>
+                  )}
                   {link.allowPreview && (
                     <button
                       onClick={() => copyToClipboard(`${window.location.origin}/api/sharing/preview/${link.token}`)}
@@ -284,39 +381,49 @@ const FileSharing = () => {
         )}
       </div>
 
-      {/* Sample File IDs */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">
-            <i className="fas fa-info-circle"></i>
-            Sample File IDs
-          </h2>
+      {userFiles.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">
+              <i className="fas fa-folder"></i>
+              Your Files
+            </h2>
+            <button onClick={loadUserFiles} className="btn btn-sm btn-outline">
+              <i className="fas fa-sync"></i>
+              Refresh
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userFiles.slice(0, 6).map((file) => (
+              <button
+                key={file.fileId}
+                onClick={() => setCreateForm(prev => ({ ...prev, fileId: file.fileId }))}
+                className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <i className={`fas ${file.mimetype?.includes('image') ? 'fa-image' :
+                      file.mimetype?.includes('pdf') ? 'fa-file-pdf' :
+                        file.mimetype?.includes('csv') ? 'fa-file-csv' :
+                          'fa-file'
+                    } text-blue-600`}></i>
+                  <code className="text-blue-600 text-sm">{file.fileId}</code>
+                </div>
+                <p className="font-medium text-gray-800 truncate">{file.fileName}</p>
+                <p className="text-sm text-gray-600">
+                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB • {file.mimetype?.split('/')[1]?.toUpperCase()}
+                </p>
+              </button>
+            ))}
+          </div>
+
+          {userFiles.length > 6 && (
+            <p className="text-sm text-gray-500 text-center mt-4">
+              Showing first 6 files. Use the dropdown above to see all files.
+            </p>
+          )}
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
-            onClick={() => setCreateForm(prev => ({ ...prev, fileId: 'file-001' }))}
-            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-          >
-            <code className="text-blue-600">file-001</code>
-            <p className="text-sm text-gray-600 mt-1">Sample PDF document</p>
-          </button>
-          <button
-            onClick={() => setCreateForm(prev => ({ ...prev, fileId: 'file-002' }))}
-            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-          >
-            <code className="text-blue-600">file-002</code>
-            <p className="text-sm text-gray-600 mt-1">Company data CSV</p>
-          </button>
-          <button
-            onClick={() => setCreateForm(prev => ({ ...prev, fileId: 'file-003' }))}
-            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-          >
-            <code className="text-blue-600">file-003</code>
-            <p className="text-sm text-gray-600 mt-1">Sample image file</p>
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

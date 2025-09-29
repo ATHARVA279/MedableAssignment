@@ -2,21 +2,18 @@ const winston = require('winston');
 const path = require('path');
 const config = require('../config');
 
-// Ensure logs directory exists
 const fs = require('fs');
 const logsDir = path.dirname(config.logging.file);
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Custom log format
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
   winston.format.json()
 );
 
-// Console format for development
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'HH:mm:ss' }),
@@ -29,37 +26,32 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Create logger instance
 const logger = winston.createLogger({
   level: config.logging.level,
   format: logFormat,
   defaultMeta: { service: 'file-processing-api' },
   transports: [
-    // Error log file
     new winston.transports.File({
       filename: config.logging.errorFile,
       level: 'error',
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 5
     }),
     
-    // Combined log file
     new winston.transports.File({
       filename: config.logging.file,
-      maxsize: 5242880, // 5MB
+      maxsize: 5242880,
       maxFiles: 5
     })
   ]
 });
 
-// Add console transport in development
 if (config.server.isDevelopment) {
   logger.add(new winston.transports.Console({
     format: consoleFormat
   }));
 }
 
-// Security event logger
 const securityLogger = winston.createLogger({
   level: 'info',
   format: logFormat,
@@ -73,7 +65,6 @@ const securityLogger = winston.createLogger({
   ]
 });
 
-// Audit logger for file operations
 const auditLogger = winston.createLogger({
   level: 'info',
   format: logFormat,
@@ -87,7 +78,6 @@ const auditLogger = winston.createLogger({
   ]
 });
 
-// Helper functions
 const logFileOperation = (operation, fileId, userId, details = {}) => {
   auditLogger.info('File operation', {
     operation,

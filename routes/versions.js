@@ -16,7 +16,6 @@ const {
 
 const router = express.Router();
 
-// Configure multer for version uploads
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -25,10 +24,6 @@ const upload = multer({
   }
 });
 
-/**
- * Get all versions of a file
- * GET /api/versions/:fileId
- */
 router.get('/:fileId', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   
@@ -51,10 +46,6 @@ router.get('/:fileId', authenticateToken, asyncHandler(async (req, res) => {
   });
 }));
 
-/**
- * Get specific version details
- * GET /api/versions/:fileId/:versionId
- */
 router.get('/:fileId/:versionId', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId, versionId } = req.params;
   
@@ -79,10 +70,6 @@ router.get('/:fileId/:versionId', authenticateToken, asyncHandler(async (req, re
   });
 }));
 
-/**
- * Create new version of a file
- * POST /api/versions/:fileId
- */
 router.post('/:fileId', authenticateToken, upload.single('file'), asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   const { changeDescription = '' } = req.body;
@@ -93,10 +80,8 @@ router.post('/:fileId', authenticateToken, upload.single('file'), asyncHandler(a
   
   const file = req.file;
   
-  // Validate file
   await validateFile(file);
   
-  // Create new version
   const version = await createFileVersion(
     fileId,
     file.buffer,
@@ -121,10 +106,6 @@ router.post('/:fileId', authenticateToken, upload.single('file'), asyncHandler(a
   });
 }));
 
-/**
- * Delete a specific version
- * DELETE /api/versions/:fileId/:versionId
- */
 router.delete('/:fileId/:versionId', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId, versionId } = req.params;
   
@@ -137,10 +118,6 @@ router.delete('/:fileId/:versionId', authenticateToken, asyncHandler(async (req,
   });
 }));
 
-/**
- * Restore a specific version
- * POST /api/versions/:fileId/:versionId/restore
- */
 router.post('/:fileId/:versionId/restore', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId, versionId } = req.params;
   
@@ -158,10 +135,6 @@ router.post('/:fileId/:versionId/restore', authenticateToken, asyncHandler(async
   });
 }));
 
-/**
- * Compare two versions
- * GET /api/versions/:fileId/compare/:version1Id/:version2Id
- */
 router.get('/:fileId/compare/:version1Id/:version2Id', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId, version1Id, version2Id } = req.params;
   
@@ -173,10 +146,6 @@ router.get('/:fileId/compare/:version1Id/:version2Id', authenticateToken, asyncH
   });
 }));
 
-/**
- * Get version statistics
- * GET /api/versions/:fileId/stats
- */
 router.get('/:fileId/stats', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   
@@ -192,10 +161,6 @@ router.get('/:fileId/stats', authenticateToken, asyncHandler(async (req, res) =>
   });
 }));
 
-/**
- * Get latest version
- * GET /api/versions/:fileId/latest
- */
 router.get('/:fileId/latest', authenticateToken, asyncHandler(async (req, res) => {
   const { fileId } = req.params;
   

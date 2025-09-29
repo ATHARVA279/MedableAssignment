@@ -1,6 +1,3 @@
-// ARCHIVE DOWNLOAD ENDPOINT - Final puzzle location
-// Hint from processing logs: "archive download endpoint with key: ARCHIVE_MASTER_2024"
-
 const express = require("express");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
@@ -9,7 +6,6 @@ const { asyncHandler } = require("../middleware/errorHandler");
 
 const router = express.Router();
 
-// Mock archive data
 const archiveContents = [
   {
     filename: "system-backup.zip",

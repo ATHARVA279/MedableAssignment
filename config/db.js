@@ -1,29 +1,22 @@
 const mongoose = require('mongoose');
 const { logger } = require('../utils/logger');
 
-/**
- * MongoDB Connection Configuration
- */
 class DatabaseConnection {
   constructor() {
     this.isConnected = false;
     this.connectionAttempts = 0;
     this.maxRetries = 5;
-    this.retryDelay = 5000; // 5 seconds
+    this.retryDelay = 5000;
   }
 
-  /**
-   * Connect to MongoDB
-   */
   async connect() {
     try {
-      const mongoUri = process.env.MONGO_URI;
+      const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/file_uploads';
       
-      // MongoDB connection options (updated for newer Mongoose versions)
       const options = {
-        maxPoolSize: 10, // Maintain up to 10 socket connections
-        serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-        socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
       };
 
       await mongoose.connect(mongoUri, options);
@@ -31,7 +24,12 @@ class DatabaseConnection {
       this.isConnected = true;
       this.connectionAttempts = 0;
       
-      console.log('MongoDB connected successfully');
+      logger.info('MongoDB connected successfully', {
+        uri: mongoUri.replace(/\/\/.*@/, '//***:***@'),
+        database: mongoose.connection.db.databaseName
+      });
+      
+      console.log('🍃 MongoDB connected successfully');
       
       return true;
     } catch (error) {
@@ -44,13 +42,13 @@ class DatabaseConnection {
         maxRetries: this.maxRetries
       });
       
-      console.error('MongoDB connection failed:', error.message);
+      console.error('❌ MongoDB connection failed:', error.message);
       
       if (this.connectionAttempts < this.maxRetries) {
         console.log(`🔄 Retrying connection in ${this.retryDelay / 1000} seconds...`);
         setTimeout(() => this.connect(), this.retryDelay);
       } else {
-        console.error('Max connection attempts reached.');
+        console.error('❌ Max connection attempts reached. Exiting...');
         process.exit(1);
       }
       
@@ -58,28 +56,22 @@ class DatabaseConnection {
     }
   }
 
-  /**
-   * Disconnect from MongoDB
-   */
   async disconnect() {
     try {
       await mongoose.disconnect();
       this.isConnected = false;
       
       logger.info('MongoDB disconnected successfully');
-      console.log('MongoDB disconnected');
+      console.log('🍃 MongoDB disconnected');
       
       return true;
     } catch (error) {
       logger.error('MongoDB disconnection failed', { error: error.message });
-      console.error('MongoDB disconnection failed:', error.message);
+      console.error('❌ MongoDB disconnection failed:', error.message);
       return false;
     }
   }
 
-  /**
-   * Get connection status
-   */
   getStatus() {
     return {
       isConnected: this.isConnected,
@@ -91,16 +83,12 @@ class DatabaseConnection {
     };
   }
 
-  /**
-   * Health check
-   */
   async healthCheck() {
     try {
       if (!this.isConnected) {
         return { healthy: false, message: 'Not connected to database' };
       }
 
-      // Ping the database
       await mongoose.connection.db.admin().ping();
       
       return {
@@ -119,7 +107,6 @@ class DatabaseConnection {
   }
 }
 
-// Connection event handlers
 mongoose.connection.on('connected', () => {
   logger.info('Mongoose connected to MongoDB');
 });
@@ -132,7 +119,6 @@ mongoose.connection.on('disconnected', () => {
   logger.warn('Mongoose disconnected from MongoDB');
 });
 
-// Handle application termination
 process.on('SIGINT', async () => {
   try {
     await mongoose.connection.close();
@@ -144,7 +130,6 @@ process.on('SIGINT', async () => {
   }
 });
 
-// Global database connection instance
 const dbConnection = new DatabaseConnection();
 
 module.exports = {

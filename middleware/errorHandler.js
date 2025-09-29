@@ -1,8 +1,3 @@
-/**
- * Centralized error handling middleware with retry integration
- */
-
-// Custom error class for application errors
 class AppError extends Error {
   constructor(message, statusCode = 500, isOperational = true) {
     super(message);
@@ -10,7 +5,6 @@ class AppError extends Error {
     this.isOperational = isOperational;
     this.name = this.constructor.name;
     
-    // Retry-related properties
     this.retryAttempts = 0;
     this.totalDuration = 0;
     this.attemptHistory = [];
@@ -20,7 +14,6 @@ class AppError extends Error {
   }
 }
 
-// Enhanced error class for retry-specific errors
 class RetryableError extends AppError {
   constructor(message, statusCode = 500, maxRetries = 3) {
     super(message, statusCode, true);
@@ -30,7 +23,6 @@ class RetryableError extends AppError {
   }
 }
 
-// Permanent error class (should not be retried)
 class PermanentError extends AppError {
   constructor(message, statusCode = 400) {
     super(message, statusCode, true);
@@ -39,7 +31,6 @@ class PermanentError extends AppError {
   }
 }
 
-// Enhanced error logger with retry information
 function logError(error, req = null) {
   const timestamp = new Date().toISOString();
   const logEntry = {
@@ -49,7 +40,6 @@ function logError(error, req = null) {
       message: error.message,
       stack: error.stack,
       statusCode: error.statusCode,
-      // Include retry information if available
       retryAttempts: error.retryAttempts || 0,
       totalDuration: error.totalDuration || 0,
       attemptHistory: error.attemptHistory || [],
@@ -72,9 +62,7 @@ function logError(error, req = null) {
   console.error('Application Error:', JSON.stringify(logEntry, null, 2));
 }
 
-// Sanitize error for client response
 function sanitizeError(error) {
-  // Don't expose internal errors to clients
   if (!error.isOperational) {
     return {
       error: 'Internal server error',
@@ -87,12 +75,9 @@ function sanitizeError(error) {
   };
 }
 
-// Express error handling middleware
 function errorHandler(error, req, res, next) {
-  // Log the error
   logError(error, req);
   
-  // Determine status code
   let statusCode = 500;
   if (error.statusCode) {
     statusCode = error.statusCode;
@@ -104,19 +89,16 @@ function errorHandler(error, req, res, next) {
     statusCode = 403;
   }
   
-  // Send sanitized error response
   const sanitized = sanitizeError(error);
   res.status(statusCode).json(sanitized);
 }
 
-// Async error wrapper for route handlers
 function asyncHandler(fn) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
 
-// Enhanced common error responses with retry information
 const commonErrors = {
   notFound: (resource = 'Resource') => new PermanentError(`${resource} not found`, 404),
   unauthorized: (message = 'Authentication required') => new PermanentError(message, 401),
@@ -126,23 +108,19 @@ const commonErrors = {
   unsupportedMediaType: (message = 'Unsupported file type') => new PermanentError(message, 415),
   tooManyRequests: (message = 'Too many requests') => new RetryableError(message, 429, 5),
   
-  // New retry-aware errors
   networkError: (message = 'Network error occurred') => new RetryableError(message, 502, 4),
   serviceUnavailable: (message = 'Service temporarily unavailable') => new RetryableError(message, 503, 3),
   timeout: (message = 'Operation timed out') => new RetryableError(message, 408, 3),
   temporaryFailure: (message = 'Temporary failure') => new RetryableError(message, 500, 3),
   
-  // Processing specific errors
   processingFailed: (message = 'File processing failed') => new RetryableError(message, 422, 2),
   uploadFailed: (message = 'File upload failed') => new RetryableError(message, 500, 5),
   storageFailed: (message = 'Storage operation failed') => new RetryableError(message, 500, 3)
 };
 
-// Async handler with retry integration awareness
 function asyncHandlerWithRetry(fn, retryConfig = {}) {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(error => {
-      // Tag error with retry configuration if not already present
       if (!error.retryConfig && retryConfig) {
         error.retryConfig = retryConfig;
       }

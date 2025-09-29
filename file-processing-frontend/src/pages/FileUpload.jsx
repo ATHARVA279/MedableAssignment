@@ -56,7 +56,6 @@ const FileUpload = () => {
       setUploadResult(response.data)
       toast.success('File uploaded successfully!')
 
-      // Reset form
       setUploadOptions({
         createVersion: false,
         parentFileId: '',
@@ -90,7 +89,6 @@ const FileUpload = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
       <div className="card">
         <div className="card-header">
           <h1 className="card-title">
@@ -103,7 +101,6 @@ const FileUpload = () => {
         </p>
       </div>
 
-      {/* Upload Options */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
@@ -152,7 +149,6 @@ const FileUpload = () => {
         </div>
       </div>
 
-      {/* File Drop Zone */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
@@ -192,7 +188,6 @@ const FileUpload = () => {
           </div>
         </div>
 
-        {/* Upload Progress */}
         {uploading && (
           <div className="mt-4">
             <div className="flex justify-between items-center mb-2">
@@ -205,7 +200,6 @@ const FileUpload = () => {
           </div>
         )}
 
-        {/* Manual Upload Button */}
         {acceptedFiles.length > 0 && !uploading && (
           <div className="mt-4 flex justify-center">
             <button
@@ -218,7 +212,6 @@ const FileUpload = () => {
         )}
       </div>
 
-      {/* Upload Result */}
       {uploadResult && (
         <div className="card">
           <div className="card-header">
@@ -250,7 +243,6 @@ const FileUpload = () => {
                 </div>
               </div>
 
-              {/* File Details */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-800 mb-3">File Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -8,9 +8,9 @@ class MemoryMonitor extends EventEmitter {
   constructor() {
     super();
     this.thresholds = {
-      warning: 0.8,    // 80% memory usage warning
-      critical: 0.9,   // 90% memory usage critical
-      emergency: 0.95  // 95% memory usage emergency
+      warning: 0.85,   // 85% memory usage warning
+      critical: 0.93,  // 93% memory usage critical (raised from 90%)
+      emergency: 0.97  // 97% memory usage emergency (raised from 95%)
     };
     
     this.limits = {

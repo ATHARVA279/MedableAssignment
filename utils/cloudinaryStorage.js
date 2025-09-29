@@ -293,6 +293,60 @@ function generateOptimizedUrl(publicId, resourceType = 'auto', options = {}) {
 }
 
 /**
+ * Generate download URL for files (especially PDFs and raw files)
+ */
+function generateDownloadUrl(publicId, resourceType = 'raw', filename = null) {
+  const options = {
+    resource_type: resourceType,
+    flags: 'attachment',
+    secure: true
+  };
+
+  // Add filename if provided
+  if (filename) {
+    // Extract just the filename without path
+    const cleanFilename = filename.split('/').pop();
+    options.public_id = `${publicId}/${cleanFilename}`;
+  }
+
+  return cloudinary.url(publicId, options);
+}
+
+/**
+ * Extract public ID from Cloudinary URL
+ */
+function extractPublicIdFromUrl(cloudinaryUrl) {
+  try {
+    const urlParts = cloudinaryUrl.split('/');
+    const uploadIndex = urlParts.findIndex(part => part === 'upload');
+    
+    if (uploadIndex === -1) {
+      throw new Error('Invalid Cloudinary URL format');
+    }
+    
+    // Get everything after 'upload' and version (if present)
+    let pathParts = urlParts.slice(uploadIndex + 1);
+    
+    // Remove version if present (starts with 'v' followed by numbers)
+    if (pathParts[0] && pathParts[0].match(/^v\d+$/)) {
+      pathParts = pathParts.slice(1);
+    }
+    
+    // Join the remaining parts and remove file extension
+    const publicIdWithExtension = pathParts.join('/');
+    const publicId = publicIdWithExtension.replace(/\.[^/.]+$/, '');
+    
+    return publicId;
+  } catch (error) {
+    logger.error('Failed to extract public ID from URL', {
+      url: cloudinaryUrl,
+      error: error.message
+    });
+    throw new Error(`Failed to extract public ID: ${error.message}`);
+  }
+}
+
+/**
  * Get file metadata from Cloudinary
  */
 async function getFileMetadata(publicId, resourceType = 'auto') {
@@ -392,6 +446,8 @@ module.exports = {
   deleteFromCloudinary,
   generateThumbnailUrl,
   generateOptimizedUrl,
+  generateDownloadUrl,
+  extractPublicIdFromUrl,
   getFileMetadata,
   isCloudinaryConfigured,
   testCloudinaryConnection,

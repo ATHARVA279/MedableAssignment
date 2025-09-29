@@ -4,11 +4,9 @@ const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
-// Simple login endpoint (for development/testing)
 router.post('/login', asyncHandler(async (req, res) => {
   const { userId = 'test-user', role = 'user' } = req.body;
   
-  // Validate role
   if (!['user', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'Role must be either "user" or "admin"' });
   }
@@ -23,11 +21,9 @@ router.post('/login', asyncHandler(async (req, res) => {
   });
 }));
 
-// Generate test tokens for development/testing
 router.post('/test-token', asyncHandler(async (req, res) => {
   const { userId = 'test-user', role = 'user' } = req.body;
   
-  // Validate role
   if (!['user', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'Role must be either "user" or "admin"' });
   }
@@ -43,7 +39,6 @@ router.post('/test-token', asyncHandler(async (req, res) => {
   });
 }));
 
-// Get current user info (requires valid token)
 router.get('/me', (req, res) => {
   const authHeader = req.get('authorization');
   

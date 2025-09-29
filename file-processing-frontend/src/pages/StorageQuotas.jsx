@@ -93,7 +93,6 @@ const StorageQuotas = () => {
 
       {quotaInfo && quotaInfo.quota && quotaInfo.usage && (
         <>
-          {/* Quota Overview */}
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">
@@ -126,7 +125,6 @@ const StorageQuotas = () => {
                 </p>
               </div>
 
-              {/* Files Count */}
               <div className="text-center">
                 <div className="w-20 h-20 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
                   <i className="fas fa-files text-green-600 text-2xl"></i>
@@ -137,7 +135,6 @@ const StorageQuotas = () => {
                 </p>
               </div>
 
-              {/* Daily Uploads */}
               <div className="text-center">
                 <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
                   <i className="fas fa-upload text-blue-600 text-2xl"></i>
@@ -148,7 +145,6 @@ const StorageQuotas = () => {
                 </p>
               </div>
 
-              {/* Max File Size */}
               <div className="text-center">
                 <div className="w-20 h-20 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center">
                   <i className="fas fa-weight-hanging text-purple-600 text-2xl"></i>
@@ -161,7 +157,6 @@ const StorageQuotas = () => {
             </div>
           </div>
 
-          {/* Detailed Usage */}
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">
@@ -171,7 +166,6 @@ const StorageQuotas = () => {
             </div>
             
             <div className="space-y-4">
-              {/* Storage Progress */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-medium">Storage Usage</span>
@@ -187,7 +181,6 @@ const StorageQuotas = () => {
                 </div>
               </div>
 
-              {/* Files Progress */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-medium">Files Count</span>
@@ -203,7 +196,6 @@ const StorageQuotas = () => {
                 </div>
               </div>
 
-              {/* Daily Uploads Progress */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="font-medium">Daily Uploads</span>
@@ -221,7 +213,6 @@ const StorageQuotas = () => {
             </div>
           </div>
 
-          {/* Warnings */}
           {quotaInfo.warnings && quotaInfo.warnings.length > 0 && (
             <div className="card">
               <div className="card-header">
@@ -261,7 +252,6 @@ const StorageQuotas = () => {
         </>
       )}
 
-      {/* Quota Check Tool */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
@@ -310,7 +300,6 @@ const StorageQuotas = () => {
         </form>
       </div>
 
-      {/* Quota Information */}
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">

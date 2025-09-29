@@ -9,34 +9,24 @@ const {
 
 const router = express.Router();
 
-// In-memory storage for share links (use database in production)
 const shareLinks = new Map();
 
 // Default expiration times
 const EXPIRATION_OPTIONS = {
-  "1h": 60 * 60 * 1000, // 1 hour
-  "24h": 24 * 60 * 60 * 1000, // 24 hours
-  "7d": 7 * 24 * 60 * 60 * 1000, // 7 days
-  "30d": 30 * 24 * 60 * 60 * 1000, // 30 days
+  "1h": 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
 };
 
-/**
- * Generate secure share token
- */
 function generateShareToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-/**
- * Check if share link is expired
- */
 function isExpired(shareData) {
   return Date.now() > shareData.expiresAt;
 }
 
-/**
- * Clean up expired share links
- */
 function cleanupExpiredLinks() {
   const now = Date.now();
   for (const [token, shareData] of shareLinks.entries()) {
@@ -46,13 +36,8 @@ function cleanupExpiredLinks() {
   }
 }
 
-// Clean up expired links every hour
 setInterval(cleanupExpiredLinks, 60 * 60 * 1000);
 
-/**
- * Create share link for file
- * POST /api/sharing/:fileId
- */
 router.post(
   "/:fileId",
   authenticateToken,
@@ -65,7 +50,6 @@ router.post(
       allowPreview = true,
     } = req.body;
 
-    // Validate expiration time
     if (!EXPIRATION_OPTIONS[expiresIn]) {
       throw commonErrors.badRequest(
         `Invalid expiration time. Allowed: ${Object.keys(
@@ -74,15 +58,56 @@ router.post(
       );
     }
 
-    // TODO: Verify user owns the file (would need to check against file storage)
-    // For now, we'll assume the file exists and user has access
+    const { fileService } = require("../services/fileService");
+    let file;
+    try {
+      file = await fileService.getFileById(fileId);
+
+      if (file.uploaderId !== req.user.userId) {
+        throw commonErrors.forbidden("You can only share your own files");
+      }
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw commonErrors.notFound("File not found");
+      }
+      throw error;
+    }
 
     const shareToken = generateShareToken();
     const expiresAt = Date.now() + EXPIRATION_OPTIONS[expiresIn];
 
+    let directDownloadUrl = file.secureUrl;
+
+    if (
+      file.mimetype === "application/pdf" ||
+      !file.mimetype.startsWith("image/")
+    ) {
+      const {
+        generateDownloadUrl,
+        extractPublicIdFromUrl,
+      } = require("../utils/cloudinaryStorage");
+
+      try {
+        const publicId = extractPublicIdFromUrl(file.secureUrl);
+
+        directDownloadUrl = generateDownloadUrl(
+          publicId,
+          "raw",
+          file.originalName
+        );
+      } catch (error) {
+        directDownloadUrl = file.secureUrl;
+      }
+    }
+
     const shareData = {
       token: shareToken,
       fileId,
+      fileName: file.originalName,
+      fileSize: file.size,
+      mimetype: file.mimetype,
+      cloudinaryUrl: file.secureUrl,
+      directDownloadUrl,
       createdBy: req.user.userId,
       createdAt: Date.now(),
       expiresAt,
@@ -105,6 +130,10 @@ router.post(
         url: `${req.protocol}://${req.get(
           "host"
         )}/api/sharing/download/${shareToken}`,
+        directUrl: directDownloadUrl,
+        originalUrl: file.secureUrl,
+        fileName: file.originalName,
+        fileSize: file.size,
         expiresAt: new Date(expiresAt).toISOString(),
         expiresIn,
         maxDownloads,
@@ -115,10 +144,6 @@ router.post(
   })
 );
 
-/**
- * Get share link info
- * GET /api/sharing/:token/info
- */
 router.get(
   "/:token/info",
   asyncHandler(async (req, res) => {
@@ -155,10 +180,6 @@ router.get(
   })
 );
 
-/**
- * Download file via share link
- * GET /api/sharing/download/:token
- */
 router.get(
   "/download/:token",
   asyncHandler(async (req, res) => {
@@ -180,7 +201,6 @@ router.get(
       throw commonErrors.forbidden("Share link has been deactivated");
     }
 
-    // Check password if required
     if (shareData.password) {
       if (!password) {
         return res.status(401).json({
@@ -198,7 +218,6 @@ router.get(
       }
     }
 
-    // Check download limit
     if (
       shareData.maxDownloads &&
       shareData.downloadCount >= shareData.maxDownloads
@@ -206,27 +225,60 @@ router.get(
       throw commonErrors.forbidden("Download limit exceeded");
     }
 
-    // Increment download count
     shareData.downloadCount++;
 
-    // TODO: In real implementation, serve the actual file
-    // For now, return file info and download URL
+    if (shareData.cloudinaryUrl) {
+      let downloadUrl = shareData.directDownloadUrl || shareData.cloudinaryUrl;
+
+      if (
+        !shareData.directDownloadUrl &&
+        (shareData.mimetype === "application/pdf" ||
+          !shareData.mimetype.startsWith("image/"))
+      ) {
+        const {
+          generateDownloadUrl,
+          extractPublicIdFromUrl,
+        } = require("../utils/cloudinaryStorage");
+
+        try {
+          const publicId = extractPublicIdFromUrl(shareData.cloudinaryUrl);
+          downloadUrl = generateDownloadUrl(
+            publicId,
+            "raw",
+            shareData.fileName
+          );
+        } catch (error) {
+          downloadUrl = shareData.cloudinaryUrl;
+        }
+      }
+
+      res.set({
+        "Content-Disposition": `attachment; filename="${shareData.fileName}"`,
+        "Content-Type": shareData.mimetype || "application/octet-stream",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      });
+
+      return res.redirect(downloadUrl);
+    }
+
     res.json({
       message: "File download authorized",
       fileId: shareData.fileId,
-      downloadUrl: `/api/upload/${shareData.fileId}/download`,
+      fileName: shareData.fileName,
+      fileSize: shareData.fileSize,
+      mimetype: shareData.mimetype,
+      directDownloadUrl: shareData.cloudinaryUrl,
       downloadCount: shareData.downloadCount,
       remainingDownloads: shareData.maxDownloads
         ? shareData.maxDownloads - shareData.downloadCount
         : null,
+      note: "Use directDownloadUrl for immediate download",
     });
   })
 );
 
-/**
- * Preview file via share link (if allowed)
- * GET /api/sharing/preview/:token
- */
 router.get(
   "/preview/:token",
   asyncHandler(async (req, res) => {
@@ -252,7 +304,6 @@ router.get(
       throw commonErrors.forbidden("Preview not allowed for this share link");
     }
 
-    // Check password if required
     if (shareData.password) {
       if (!password) {
         return res.status(401).json({
@@ -270,7 +321,6 @@ router.get(
       }
     }
 
-    // TODO: In real implementation, return file preview/metadata
     res.json({
       message: "File preview authorized",
       fileId: shareData.fileId,
@@ -280,10 +330,6 @@ router.get(
   })
 );
 
-/**
- * List user's share links
- * GET /api/sharing
- */
 router.get(
   "/",
   authenticateToken,
@@ -295,6 +341,9 @@ router.get(
         userShares.push({
           token,
           fileId: shareData.fileId,
+          fileName: shareData.fileName || "Unknown File",
+          fileSize: shareData.fileSize || 0,
+          mimetype: shareData.mimetype || "application/octet-stream",
           createdAt: new Date(shareData.createdAt).toISOString(),
           expiresAt: new Date(shareData.expiresAt).toISOString(),
           expiresIn: shareData.expiresIn,
@@ -307,14 +356,16 @@ router.get(
           url: `${req.protocol}://${req.get(
             "host"
           )}/api/sharing/download/${token}`,
+          directUrl: shareData.directDownloadUrl || shareData.cloudinaryUrl,
+          originalUrl: shareData.cloudinaryUrl,
         });
       }
     }
 
-    // Sort by creation date (newest first)
     userShares.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     res.json({
+      shareLinks: userShares,
       shares: userShares,
       total: userShares.length,
       active: userShares.filter((s) => s.isActive && !s.isExpired).length,
@@ -323,10 +374,6 @@ router.get(
   })
 );
 
-/**
- * Update share link
- * PUT /api/sharing/:token
- */
 router.put(
   "/:token",
   authenticateToken,
@@ -344,7 +391,6 @@ router.put(
       throw commonErrors.forbidden("You can only modify your own share links");
     }
 
-    // Update allowed fields
     if (typeof isActive === "boolean") {
       shareData.isActive = isActive;
     }
@@ -369,10 +415,6 @@ router.put(
   })
 );
 
-/**
- * Delete share link
- * DELETE /api/sharing/:token
- */
 router.delete(
   "/:token",
   authenticateToken,
@@ -394,6 +436,109 @@ router.delete(
     res.json({
       message: "Share link deleted successfully",
     });
+  })
+);
+
+router.get(
+  "/files",
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { fileService } = require("../services/fileService");
+
+    try {
+      const result = await fileService.getFilesByUploader(req.user.userId, {
+        page: 1,
+        limit: 50,
+        status: "processed",
+      });
+
+      const files = result.files.map((file) => ({
+        fileId: file.fileId,
+        fileName: file.originalName,
+        fileSize: file.size,
+        mimetype: file.mimetype,
+        uploadedAt: file.uploadedAt,
+        status: file.status,
+        downloadCount: file.downloadCount || 0,
+      }));
+
+      res.json({
+        files,
+        total: result.pagination.total,
+      });
+    } catch (error) {
+      res.json({
+        files: [
+          {
+            fileId: "file-001",
+            fileName: "sample-document.pdf",
+            fileSize: 1024000,
+            mimetype: "application/pdf",
+          },
+          {
+            fileId: "file-002",
+            fileName: "data-export.csv",
+            fileSize: 512000,
+            mimetype: "text/csv",
+          },
+          {
+            fileId: "file-003",
+            fileName: "profile-image.jpg",
+            fileSize: 256000,
+            mimetype: "image/jpeg",
+          },
+        ],
+        total: 3,
+        note: "Sample files for demonstration",
+      });
+    }
+  })
+);
+
+router.get(
+  "/test-url/:fileId",
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const { fileId } = req.params;
+    const { fileService } = require("../services/fileService");
+    const {
+      generateDownloadUrl,
+      extractPublicIdFromUrl,
+    } = require("../utils/cloudinaryStorage");
+
+    try {
+      const file = await fileService.getFileById(fileId);
+
+      if (file.uploaderId !== req.user.userId) {
+        throw commonErrors.forbidden("You can only test your own files");
+      }
+
+      const publicId = extractPublicIdFromUrl(file.secureUrl);
+      const downloadUrl = generateDownloadUrl(
+        publicId,
+        "raw",
+        file.originalName
+      );
+
+      res.json({
+        fileId: file.fileId,
+        fileName: file.originalName,
+        mimetype: file.mimetype,
+        originalUrl: file.secureUrl,
+        extractedPublicId: publicId,
+        generatedDownloadUrl: downloadUrl,
+        urlComparison: {
+          hasAttachmentFlag: downloadUrl.includes("fl_attachment"),
+          isSecure: downloadUrl.startsWith("https://"),
+          domain: downloadUrl.split("/")[2],
+        },
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error.message,
+        fileId,
+      });
+    }
   })
 );
 

@@ -89,7 +89,6 @@ const FileManager = () => {
 
   return (
     <div className="file-manager">
-      {/* Page Header */}
       <div className="card">
         <div className="card-header">
           <h1 className="card-title"><i className="fas fa-folder-open"></i> File Manager</h1>
@@ -187,7 +186,6 @@ const FileManager = () => {
         )}
       </div>
 
-      {/* Modal */}
       {selectedFile && (
         <div className="modal-backdrop">
           <div className="modal">
