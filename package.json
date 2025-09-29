@@ -6,24 +6,53 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "build": "echo 'Build complete'"
+    "build": "echo 'Build complete'",
+    "test:cloudinary": "node test-cloudinary.js",
+    "setup": "node test-cloudinary.js",
+    "db:migrate": "node scripts/migrate-to-mongodb.js migrate",
+    "db:health": "node scripts/migrate-to-mongodb.js health",
+    "db:stats": "node scripts/migrate-to-mongodb.js stats",
+    "backup:create": "node -e \"require('./utils/backupRecovery').backupRecovery.createFullBackup().then(console.log).catch(console.error)\"",
+    "backup:list": "node -e \"require('./utils/backupRecovery').backupRecovery.listBackups().then(console.log).catch(console.error)\"",
+    "health:check": "curl http://localhost:8888/health",
+    "memory:stats": "node -e \"require('./utils/memoryMonitor').memoryMonitor.generateReport().then ? require('./utils/memoryMonitor').memoryMonitor.generateReport() : console.log(require('./utils/memoryMonitor').memoryMonitor.generateReport())\"",
+    "virus:test": "node -e \"require('./utils/virusScanner').virusScanner.getHealthStatus().then(console.log).catch(console.error)\""
   },
   "dependencies": {
     "archiver": "^6.0.1",
+    "axios": "^1.12.2",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.5",
-    "csv-parser": "^3.0.0",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "file-type": "^18.7.0",
+    "form-data": "^4.0.4",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mime-types": "^2.1.35",
+    "mongoose": "^8.18.2",
     "multer": "^1.4.5-lts.1",
-    "sharp": "^0.33.0",
+    "pdf-parse": "^1.1.1",
+    "sharp": "^0.33.5",
     "uuid": "^9.0.1",
-    "xlsx": "^0.18.5"
+    "validator": "^13.11.0",
+    "winston": "^3.11.0",
+    "xlsx": "^0.18.5",
+    "yauzl": "^2.10.0"
   },
   "devDependencies": {
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.0.2"
   },
-  "keywords": ["assessment", "api", "file-upload", "processing", "error-handling"],
+  "keywords": [
+    "assessment",
+    "api",
+    "file-upload",
+    "processing",
+    "error-handling"
+  ],
   "author": "Assessment Creator",
   "license": "MIT"
 }

@@ -4,6 +4,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { optionalAuth } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
@@ -52,8 +54,7 @@ const ADMIN_ACCESS_CODE = 'PROC_LOGS_ADMIN_2024';
 const SYSTEM_API_KEY = 'system-processing-key-2024';
 
 // Get processing logs
-router.get('/', async (req, res) => {
-  try {
+router.get('/', optionalAuth, asyncHandler(async (req, res) => {
     // Multiple access methods for the puzzle
     const authHeader = req.get('authorization');
     const systemKey = req.get('x-system-key');
@@ -75,15 +76,10 @@ router.get('/', async (req, res) => {
       accessLevel = 'admin';
     }
     // Method 3: JWT Token (limited access)
-    else if (authHeader) {
-      try {
-        const token = authHeader.split(' ')[1];
-        currentUser = jwt.verify(token, JWT_SECRET);
-        hasAccess = true;
-        accessLevel = currentUser.role === 'admin' ? 'admin' : 'user';
-      } catch (e) {
-        // Continue to access denied
-      }
+    else if (req.user) {
+      currentUser = req.user;
+      hasAccess = true;
+      accessLevel = currentUser.role === 'admin' ? 'admin' : 'user';
     }
 
     if (!hasAccess) {
@@ -208,14 +204,10 @@ router.get('/', async (req, res) => {
     });
 
     res.json(responseData);
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
 // Add processing log (system only)
-router.post('/', async (req, res) => {
-  try {
+router.post('/', asyncHandler(async (req, res) => {
     const systemKey = req.get('x-system-key');
     
     if (systemKey !== SYSTEM_API_KEY) {
@@ -247,9 +239,6 @@ router.post('/', async (req, res) => {
       logId: newLog.id,
       timestamp: newLog.timestamp
     });
-  } catch (error) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+}));
 
 module.exports = router;
