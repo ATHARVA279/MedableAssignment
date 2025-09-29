@@ -370,6 +370,5 @@ module.exports = {
   getFileMetadata,
   isCloudinaryConfigured,
   testCloudinaryConnection,
-  testCloudinaryUpload,
   cloudinary
 };
