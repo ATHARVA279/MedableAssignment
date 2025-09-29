@@ -201,14 +201,36 @@ if (config.development.enableTestEndpoints) {
 }
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  try {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+  } catch (error) {
+    res.json({
+      message: "File Processing API - Assessment 4",
+      status: "running",
+      environment: config.server.env,
+      endpoints: {
+        health: "/health",
+        upload: "/api/upload",
+        processingLogs: "/api/processing-logs",
+        archive: "/api/archive",
+      },
+    });
+  }
 });
 
 app.get("*", (req, res, next) => {
   if (req.path.startsWith("/api/")) {
     return next();
   }
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  try {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+  } catch (error) {
+    res.status(404).json({
+      error: "Page not found",
+      message:
+        "This is a File Processing API. Use /api endpoints or /health for status.",
+    });
+  }
 });
 
 app.use("*", (req, res) => {
@@ -249,11 +271,28 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-app.listen(PORT, config.server.host, () => {
+const HOST =
+  process.env.NODE_ENV === "production" ? "0.0.0.0" : config.server.host;
+
+app.listen(PORT, HOST, () => {
   logger.info("Server started", {
     port: PORT,
-    host: config.server.host,
+    host: HOST,
     environment: config.server.env,
     nodeVersion: process.version,
   });
+
+  console.log(
+    `📁 Assessment 4: File Processing API running on http://${HOST}:${PORT}`
+  );
+  console.log(`📋 View instructions: http://${HOST}:${PORT}`);
+  console.log(`🧩 Multi-layered puzzles and file security challenges await!`);
+  console.log(`🔧 Environment: ${config.server.env}`);
+  console.log(`☁️  Storage: ${config.storage.type.toUpperCase()}`);
+
+  if (config.server.isProduction) {
+    console.log("🔒 Production mode: Security features enabled");
+  } else {
+    console.log("🛠️  Development mode: Debug features enabled");
+  }
 });
