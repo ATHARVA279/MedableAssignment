@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { apiClient } from '../services/apiClient'
 import toast from 'react-hot-toast'
 
 const FileSharing = () => {
   const [shareLinks, setShareLinks] = useState([])
-  const [userFiles, setUserFiles] = useState([])
   const [loading, setLoading] = useState(false)
-  const [loadingFiles, setLoadingFiles] = useState(false)
   const [createForm, setCreateForm] = useState({
     fileId: '',
     expiresIn: '24h',
@@ -17,20 +15,7 @@ const FileSharing = () => {
 
   useEffect(() => {
     loadShareLinks()
-    loadUserFiles()
   }, [])
-
-  const loadUserFiles = async () => {
-    setLoadingFiles(true)
-    try {
-      const response = await apiClient.get('/api/sharing/files')
-      setUserFiles(response.data.files || [])
-    } catch (error) {
-      console.error('Failed to load user files:', error)
-    } finally {
-      setLoadingFiles(false)
-    }
-  }
 
   const loadShareLinks = async () => {
     try {
@@ -132,6 +117,25 @@ const FileSharing = () => {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">
+            <i className="fas fa-info-circle"></i>
+            How to Get File ID
+          </h2>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-medium text-blue-800 mb-2">Steps to Share a File:</h3>
+          <ol className="list-decimal list-inside space-y-2 text-blue-700">
+            <li>Go to the <strong>File Manager</strong> page</li>
+            <li>Find the file you want to share</li>
+            <li>Copy the <strong>File ID</strong> (e.g., file-abc123)</li>
+            <li>Paste it in the "File ID to Share" field below</li>
+            <li>Configure your sharing settings and create the link</li>
+          </ol>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">
             <i className="fas fa-plus"></i>
             Create Share Link
           </h2>
@@ -140,25 +144,18 @@ const FileSharing = () => {
         <form onSubmit={createShareLink} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group">
-              <label className="form-label">Select File to Share *</label>
-              <select
-                className="form-select"
+              <label className="form-label">File ID to Share *</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Enter file ID (e.g., file-abc123)"
                 value={createForm.fileId}
                 onChange={(e) => setCreateForm(prev => ({ ...prev, fileId: e.target.value }))}
                 required
-              >
-                <option value="">Choose a file to share...</option>
-                {userFiles.map((file) => (
-                  <option key={file.fileId} value={file.fileId}>
-                    {file.fileName} ({(file.fileSize / 1024 / 1024).toFixed(2)} MB)
-                  </option>
-                ))}
-              </select>
-              {loadingFiles && (
-                <p className="text-sm text-gray-500 mt-1">
-                  <i className="fas fa-spinner fa-spin"></i> Loading your files...
-                </p>
-              )}
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                <i className="fas fa-info-circle"></i> Get the file ID from the File Manager page
+              </p>
             </div>
 
             <div className="form-group">
@@ -380,50 +377,6 @@ const FileSharing = () => {
           </div>
         )}
       </div>
-
-      {userFiles.length > 0 && (
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">
-              <i className="fas fa-folder"></i>
-              Your Files
-            </h2>
-            <button onClick={loadUserFiles} className="btn btn-sm btn-outline">
-              <i className="fas fa-sync"></i>
-              Refresh
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {userFiles.slice(0, 6).map((file) => (
-              <button
-                key={file.fileId}
-                onClick={() => setCreateForm(prev => ({ ...prev, fileId: file.fileId }))}
-                className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <i className={`fas ${file.mimetype?.includes('image') ? 'fa-image' :
-                      file.mimetype?.includes('pdf') ? 'fa-file-pdf' :
-                        file.mimetype?.includes('csv') ? 'fa-file-csv' :
-                          'fa-file'
-                    } text-blue-600`}></i>
-                  <code className="text-blue-600 text-sm">{file.fileId}</code>
-                </div>
-                <p className="font-medium text-gray-800 truncate">{file.fileName}</p>
-                <p className="text-sm text-gray-600">
-                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB • {file.mimetype?.split('/')[1]?.toUpperCase()}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          {userFiles.length > 6 && (
-            <p className="text-sm text-gray-500 text-center mt-4">
-              Showing first 6 files. Use the dropdown above to see all files.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   )
 }

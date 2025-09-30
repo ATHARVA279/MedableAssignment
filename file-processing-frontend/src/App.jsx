@@ -7,7 +7,6 @@ import Navigation from './components/Navigation'
 import Dashboard from './pages/Dashboard'
 import FileUpload from './pages/FileUpload'
 import FileManager from './pages/FileManager'
-import FileVersions from './pages/FileVersions'
 import FileSharing from './pages/FileSharing'
 import StorageQuotas from './pages/StorageQuotas'
 import AdminPanel from './pages/AdminPanel'
@@ -45,7 +44,6 @@ function AppContent() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/upload" element={user ? <FileUpload /> : <Navigate to="/dashboard" />} />
           <Route path="/files" element={user ? <FileManager /> : <Navigate to="/dashboard" />} />
-          <Route path="/versions" element={user ? <FileVersions /> : <Navigate to="/dashboard" />} />
           <Route path="/sharing" element={user ? <FileSharing /> : <Navigate to="/dashboard" />} />
           <Route path="/quotas" element={user ? <StorageQuotas /> : <Navigate to="/dashboard" />} />
 

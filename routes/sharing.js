@@ -438,61 +438,6 @@ router.delete(
   })
 );
 
-router.get(
-  "/files",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileService } = require("../services/fileService");
-
-    try {
-      const result = await fileService.getFilesByUploader(req.user.userId, {
-        page: 1,
-        limit: 50,
-        status: "processed",
-      });
-
-      const files = result.files.map((file) => ({
-        fileId: file.fileId,
-        fileName: file.originalName,
-        fileSize: file.size,
-        mimetype: file.mimetype,
-        uploadedAt: file.uploadedAt,
-        status: file.status,
-        downloadCount: file.downloadCount || 0,
-      }));
-
-      res.json({
-        files,
-        total: result.pagination.total,
-      });
-    } catch (error) {
-      res.json({
-        files: [
-          {
-            fileId: "file-001",
-            fileName: "sample-document.pdf",
-            fileSize: 1024000,
-            mimetype: "application/pdf",
-          },
-          {
-            fileId: "file-002",
-            fileName: "data-export.csv",
-            fileSize: 512000,
-            mimetype: "text/csv",
-          },
-          {
-            fileId: "file-003",
-            fileName: "profile-image.jpg",
-            fileSize: 256000,
-            mimetype: "image/jpeg",
-          },
-        ],
-        total: 3,
-        note: "Sample files for demonstration",
-      });
-    }
-  })
-);
 
 router.get(
   "/test-url/:fileId",

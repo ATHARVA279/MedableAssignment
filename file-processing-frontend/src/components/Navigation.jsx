@@ -11,7 +11,6 @@ const Navigation = () => {
     { id: 'dashboard', label: 'Dashboard', icon: 'fas fa-tachometer-alt', path: '/dashboard', requireAuth: false },
     { id: 'upload', label: 'Upload Files', icon: 'fas fa-cloud-upload-alt', path: '/upload', requireAuth: true },
     { id: 'files', label: 'File Manager', icon: 'fas fa-folder-open', path: '/files', requireAuth: true },
-    { id: 'versions', label: 'File Versions', icon: 'fas fa-code-branch', path: '/versions', requireAuth: true },
     { id: 'sharing', label: 'File Sharing', icon: 'fas fa-share-alt', path: '/sharing', requireAuth: true },
     { id: 'quotas', label: 'Storage Quotas', icon: 'fas fa-chart-pie', path: '/quotas', requireAuth: true },
 

@@ -71,55 +71,6 @@ const Dashboard = () => {
       {user && (
         <div className="card">
           <div className="card-header">
-            <h2 className="card-title"><i className="fas fa-server"></i> System Status</h2>
-            <button onClick={loadSystemStats} disabled={loading} className="btn btn-sm btn-outline">
-              <i className={`fas fa-sync ${loading ? 'fa-spin' : ''}`}></i> Refresh
-            </button>
-          </div>
-
-          {systemStats ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard title="System Health" value={systemStats.status || 'Healthy'} icon="fas fa-heartbeat" color="green" />
-              <StatCard title="Storage" value="Cloudinary" icon="fas fa-cloud" color="blue" />
-              <StatCard title="Environment" value={systemStats.environment || 'Development'} icon="fas fa-cog" color="purple" />
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <div className="loading">
-                <div className="loading-spinner"></div>
-                Loading system status...
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title"><i className="fas fa-rocket"></i> Quick Actions</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, idx) => (
-            <QuickAction key={idx} action={action} user={user} onClick={() => handleQuickAction(action)} />
-          ))}
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title"><i className="fas fa-star"></i> Platform Features</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((f, idx) => (
-            <FeatureCard key={idx} feature={f} />
-          ))}
-        </div>
-      </div>
-
-      {user && (
-        <div className="card">
-          <div className="card-header">
             <h2 className="card-title"><i className="fas fa-user-circle"></i> User Information</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
