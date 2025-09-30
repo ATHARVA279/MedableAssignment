@@ -41,7 +41,7 @@ function AppContent() {
 
       <main className="container py-6">
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/"  element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/upload" element={user ? <FileUpload /> : <Navigate to="/dashboard" />} />
           <Route path="/files" element={user ? <FileManager /> : <Navigate to="/dashboard" />} />
