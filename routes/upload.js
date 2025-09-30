@@ -1,21 +1,16 @@
 const express = require("express");
 const multer = require("multer");
-const { v4: uuidv4 } = require("uuid");
-const crypto = require("crypto");
-const path = require("path");
 
-const { authenticateToken, optionalAuth } = require("../middleware/auth");
+const { authenticateToken } = require("../middleware/auth");
 const { validateFile } = require("../middleware/fileValidation");
 const {
   AppError,
   asyncHandler,
-  asyncHandlerWithRetry,
   commonErrors,
 } = require("../middleware/errorHandler");
 const {
   saveFile,
   deleteFile,
-  fileExists,
   generateThumbnailUrl,
 } = require("../utils/fileStorage");
 const {
@@ -27,16 +22,14 @@ const {
   isEncryptionEnabled,
 } = require("../utils/fileEncryption");
 const { createFileVersion } = require("../utils/fileVersioning");
-const { memoryMonitor } = require("../utils/memoryMonitor");
-const { networkTimeoutHandler } = require("../utils/networkTimeout");
 const { inputSanitizer } = require("../utils/inputSanitizer");
 const { retryOperations } = require("../utils/retryManager");
-const { FileCompressor } = require("../utils/fileCompression");
 const {
   queueManager,
   JOB_TYPES,
   JOB_PRIORITIES,
 } = require("../utils/jobQueue");
+const { logger } = require("../utils/logger");
 
 const { fileService } = require("../services/fileService");
 
@@ -45,7 +38,7 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024, 
     files: 1,
   },
   fileFilter: (req, file, cb) => {
@@ -74,41 +67,6 @@ function canAccessFile(file, user) {
   if (user && user.role === "admin") return true;
 
   return false;
-}
-
-function sanitizeFileData(file, user, includeProcessingResult = false) {
-  const sanitized = {
-    id: file.id,
-    originalName: file.originalName,
-    size: file.size,
-    mimetype: file.mimetype,
-    uploadDate: file.uploadDate,
-    status: file.status,
-    publicAccess: file.publicAccess,
-  };
-
-  if (canAccessFile(file, user)) {
-    sanitized.secureUrl = file.secureUrl;
-
-    if (file.processingResult?.thumbnailUrl) {
-      sanitized.thumbnailUrl = file.processingResult.thumbnailUrl;
-    }
-  }
-
-  if (user && (file.uploadedBy === user.userId || user.role === "admin")) {
-    sanitized.uploadedBy = file.uploadedBy;
-  }
-
-  if (
-    includeProcessingResult &&
-    canAccessFile(file, user) &&
-    file.processingResult
-  ) {
-    const { publicId, ...sanitizedProcessingResult } = file.processingResult;
-    sanitized.processingResult = sanitizedProcessingResult;
-  }
-
-  return sanitized;
 }
 
 router.get(
@@ -264,17 +222,6 @@ router.post(
       parentFileId,
     } = bodyResult.sanitized;
 
-    const memoryCheck = memoryMonitor.canAcceptUpload(
-      file.size,
-      file.originalname
-    );
-    if (!memoryCheck.allowed) {
-      throw new AppError(memoryCheck.reason, 413);
-    }
-
-    const uploadId = crypto.randomUUID();
-    memoryMonitor.registerUpload(uploadId, file.size, file.originalname);
-
     await validateFile(file);
 
     let fileBuffer = file.buffer;
@@ -282,8 +229,6 @@ router.post(
 
     if (isEncryptionEnabled()) {
       const crypto = require("crypto");
-      const encryptionKey = crypto.randomBytes(32);
-      const iv = crypto.randomBytes(16);
 
       encryptionMeta = {
         algorithm: "aes-256-gcm",
@@ -338,8 +283,6 @@ router.post(
         });
       }
     } catch (cloudinaryError) {
-      memoryMonitor.unregisterUpload(uploadId);
-
       const { logger } = require("../utils/logger");
       logger.error("Cloudinary upload failed in upload route", {
         error: cloudinaryError.message,
@@ -488,8 +431,6 @@ router.post(
       }
     });
 
-    memoryMonitor.unregisterUpload(uploadId);
-
     res.set({
       "X-File-Id": newFile.fileId,
       "X-Job-Id": jobId,
@@ -605,6 +546,8 @@ router.delete(
       throw commonErrors.forbidden("You can only delete your own files");
     }
 
+    let deletedCloudinaryPublicId = null;
+
     if (file.cloudinaryPublicId) {
       try {
         let resourceType = "auto";
@@ -616,51 +559,64 @@ router.delete(
           resourceType = "raw";
         }
 
-        await deleteFile(file.cloudinaryPublicId, resourceType);
+        const deleteResult = await deleteFile(file.cloudinaryPublicId, resourceType);
+        deletedCloudinaryPublicId = deleteResult.deletedPublicId;
+        
+        logger.info("File moved to Cloudinary deleted folder", {
+          fileId,
+          originalPublicId: file.cloudinaryPublicId,
+          deletedPublicId: deletedCloudinaryPublicId
+        });
       } catch (error) {
-        console.error("Error deleting file from Cloudinary:", error);
+        logger.error("Error soft deleting file from Cloudinary:", {
+          error: error.message,
+          fileId,
+          cloudinaryPublicId: file.cloudinaryPublicId
+        });
       }
     }
 
-    await fileService.deleteFile(fileId);
+    await fileService.deleteFile(fileId, deletedCloudinaryPublicId);
 
     res.json({
-      message: "File deleted successfully from Cloudinary",
+      message: "File soft deleted successfully",
       deletedFileId: fileId,
+      canRestore: !!deletedCloudinaryPublicId,
     });
   })
 );
 
-router.get(
-  "/:fileId/status",
+router.post(
+  "/:fileId/restore",
   authenticateToken,
   asyncHandler(async (req, res) => {
     const { fileId } = req.params;
 
     const file = await fileService.getFileById(fileId);
 
-    // Enforce access control
-    if (!canAccessFile(file, req.user)) {
-      throw commonErrors.forbidden(
-        "You do not have permission to access this file"
-      );
+    if (file.uploaderId !== req.user.userId && req.user.role !== "admin") {
+      throw commonErrors.forbidden("You can only restore your own files");
     }
 
-    const job = processingTracker.getJob(fileId);
+    if (file.status !== 'deleted') {
+      throw commonErrors.badRequest("File is not in deleted status");
+    }
+
+    if (!file.deletedCloudinaryPublicId) {
+      throw commonErrors.badRequest("File cannot be restored - no backup reference found");
+    }
+
+    const restoredFile = await fileService.restoreFile(fileId);
 
     res.json({
-      fileId: file.fileId,
-      status: file.status,
-      processingJob: job
-        ? {
-            status: job.status,
-            progress: job.progress,
-            startTime: job.startTime,
-            duration: job.duration,
-            operation: job.operation,
-          }
-        : null,
-      processingResult: file.processingResult,
+      message: "File restored successfully",
+      restoredFileId: fileId,
+      file: {
+        fileId: restoredFile.fileId,
+        originalName: restoredFile.originalName,
+        cloudinaryUrl: restoredFile.cloudinaryUrl,
+        status: restoredFile.status,
+      }
     });
   })
 );
@@ -716,246 +672,6 @@ router.get(
       storageProvider: "cloudinary",
       note: "File is served directly from Cloudinary CDN",
     });
-  })
-);
-
-router.get(
-  "/:fileId/preview",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileId } = req.params;
-
-    const file = await fileService.getFileById(fileId);
-
-    if (!canAccessFile(file, req.user)) {
-      throw commonErrors.forbidden(
-        "You do not have permission to access this file"
-      );
-    }
-
-    const previewData = {
-      fileId: file.fileId,
-      filename: file.originalName,
-      size: file.size,
-      mimetype: file.mimetype,
-      uploadDate: file.createdAt,
-      status: file.status,
-      secureUrl: file.cloudinaryUrl,
-      storageProvider: "cloudinary",
-    };
-
-    if (file.processingResult) {
-      const { publicId, ...sanitizedResult } = file.processingResult;
-      previewData.processingResult = sanitizedResult;
-    }
-
-    if (file.processingResult?.thumbnailUrl) {
-      previewData.thumbnailUrl = file.processingResult.thumbnailUrl;
-    }
-
-    res.json(previewData);
-  })
-);
-
-router.get(
-  "/job/:fileId",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileId } = req.params;
-
-    const file = await fileService.findFileById(fileId);
-    if (!file) {
-      throw commonErrors.notFound("File");
-    }
-
-    if (file.uploaderId !== req.user.userId && req.user.role !== "admin") {
-      throw commonErrors.forbidden("Access denied to this file");
-    }
-
-    const job = enhancedProcessingTracker.getJob(fileId);
-    if (!job) {
-      return res.json({
-        fileId,
-        status: "not_found",
-        message: "No processing job found for this file",
-      });
-    }
-
-    res.json({
-      fileId,
-      jobId: job.jobId,
-      status: job.status,
-      progress: job.progress,
-      attempts: job.attempts,
-      startTime: job.startTime,
-      errors: job.errors || [],
-      result: job.result,
-    });
-  })
-);
-
-router.delete(
-  "/job/:fileId",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileId } = req.params;
-
-    const file = await fileService.findFileById(fileId);
-    if (!file) {
-      throw commonErrors.notFound("File");
-    }
-
-    if (file.uploaderId !== req.user.userId && req.user.role !== "admin") {
-      throw commonErrors.forbidden("Access denied to this file");
-    }
-
-    try {
-      const cancelledJob = await enhancedProcessingTracker.cancelJob(fileId);
-
-      res.json({
-        success: true,
-        message: "Processing job cancelled successfully",
-        jobId: cancelledJob.id,
-      });
-    } catch (error) {
-      if (error.message.includes("not found")) {
-        throw commonErrors.notFound("Processing job");
-      } else if (error.message.includes("cannot cancel")) {
-        throw commonErrors.badRequest(
-          "Job cannot be cancelled in its current state"
-        );
-      } else {
-        throw error;
-      }
-    }
-  })
-);
-
-router.get(
-  "/queue/stats",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    if (req.user.role !== "admin") {
-      throw commonErrors.forbidden("Admin access required");
-    }
-
-    const queueStats = enhancedProcessingTracker.getQueueStats();
-    const allJobs = enhancedProcessingTracker.getAllJobs();
-
-    let filteredJobs = allJobs;
-    if (req.query.userId) {
-      filteredJobs = allJobs.filter((job) => job.userId === req.query.userId);
-    }
-
-    const jobsByStatus = filteredJobs.reduce((acc, job) => {
-      acc[job.status] = (acc[job.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    res.json({
-      queue: queueStats,
-      jobs: {
-        total: filteredJobs.length,
-        byStatus: jobsByStatus,
-        recent: filteredJobs
-          .sort(
-            (a, b) =>
-              new Date(b.updatedAt || b.startTime) -
-              new Date(a.updatedAt || a.startTime)
-          )
-          .slice(0, 10),
-      },
-    });
-  })
-);
-
-router.get(
-  "/jobs",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const allJobs = enhancedProcessingTracker.getAllJobs();
-    const userJobs = allJobs.filter(
-      (job) => job.userId === req.user.userId || req.user.role === "admin"
-    );
-
-    let filteredJobs = userJobs;
-    if (req.query.status) {
-      filteredJobs = userJobs.filter((job) => job.status === req.query.status);
-    }
-
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    const paginatedJobs = filteredJobs
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt || b.startTime) -
-          new Date(a.updatedAt || a.startTime)
-      )
-      .slice(skip, skip + limit);
-
-    res.json({
-      jobs: paginatedJobs,
-      pagination: {
-        page,
-        limit,
-        total: filteredJobs.length,
-        pages: Math.ceil(filteredJobs.length / limit),
-      },
-    });
-  })
-);
-
-router.post(
-  "/job/:fileId/retry",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileId } = req.params;
-
-    const file = await fileService.findFileById(fileId);
-    if (!file) {
-      throw commonErrors.notFound("File");
-    }
-
-    if (file.uploaderId !== req.user.userId && req.user.role !== "admin") {
-      throw commonErrors.forbidden("Access denied to this file");
-    }
-
-    try {
-      const cloudinaryResult = {
-        publicId: file.cloudinaryPublicId,
-        secureUrl: file.cloudinaryUrl,
-        size: file.size,
-        format: file.mimetype,
-      };
-
-      const jobId = await enhancedProcessingTracker.startJob(
-        fileId,
-        {
-          originalName: file.originalName,
-          mimetype: file.mimetype,
-          size: file.size,
-          uploaderId: file.uploaderId,
-        },
-        cloudinaryResult,
-        {
-          priority: JOB_PRIORITIES.HIGH, 
-          maxAttempts: 2,
-        }
-      );
-
-      res.json({
-        success: true,
-        message: "Processing job restarted successfully",
-        jobId,
-        fileId,
-      });
-    } catch (error) {
-      throw commonErrors.temporaryFailure(
-        `Failed to restart processing: ${error.message}`
-      );
-    }
   })
 );
 

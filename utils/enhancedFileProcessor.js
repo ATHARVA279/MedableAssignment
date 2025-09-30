@@ -3,9 +3,6 @@ const sharp = require('sharp');
 const csvParser = require('csv-parser');
 const pdfParse = require('pdf-parse');
 const { fileTypeFromBuffer } = require('file-type');
-const { pipeline } = require('stream');
-const { promisify } = require('util');
-const streamPipeline = promisify(pipeline);
 const { generateThumbnailUrl } = require('./fileStorage');
 const { logger } = require('./logger');
 const { retryOperations } = require('./retryManager');
@@ -29,7 +26,6 @@ class EnhancedProcessingTracker {
 
   registerProcessors() {
     this.queue.registerProcessor(JOB_TYPES.FILE_PROCESSING, this.processFileJob.bind(this));
-    this.queue.registerProcessor(JOB_TYPES.FILE_COMPRESSION, this.compressFileJob.bind(this));
     this.queue.registerProcessor(JOB_TYPES.THUMBNAIL_GENERATION, this.generateThumbnailJob.bind(this));
   }
 
@@ -84,30 +80,6 @@ class EnhancedProcessingTracker {
     }
   }
 
-  async compressFileJob(data, job) {
-    const { buffer, filename, mimetype, options = {} } = data;
-    
-    job.updateStatus('processing', { progress: 20 });
-    
-    const result = await FileCompressor.compressFile(buffer, filename, mimetype, options);
-    
-    job.updateStatus('processing', { progress: 100 });
-    
-    return result;
-  }
-
-  async generateThumbnailJob(data, job) {
-    const { buffer, mimetype, options = {} } = data;
-    
-    job.updateStatus('processing', { progress: 50 });
-    
-    const result = await FileCompressor.generateThumbnail(buffer, mimetype, options);
-    
-    job.updateStatus('processing', { progress: 100 });
-    
-    return result;
-  }
-
   async startJob(fileId, fileData, cloudinaryResult, options = {}) {
     const jobData = {
       fileData: { ...fileData, id: fileId },
@@ -131,7 +103,6 @@ class EnhancedProcessingTracker {
       }
     );
 
-    // Store job reference
     this.jobs.set(fileId, {
       jobId,
       fileId,
@@ -201,12 +172,10 @@ class EnhancedProcessingTracker {
       format: cloudinaryResult.format
     };
 
-    // Basic validation
     if (!cloudinaryResult.size || cloudinaryResult.size === 0) {
       throw new PermanentError('Uploaded file has zero size');
     }
 
-    // Route based on mimetype
     try {
       if (mimetype && mimetype.startsWith('image/')) {
         processingResult = await this.processImageWithRetry(cloudinaryResult, processingResult);
@@ -293,7 +262,6 @@ class EnhancedProcessingTracker {
       let thumbnailUrl = null;
       let buffer = null;
 
-      // If width/height missing or we need to generate a thumbnail locally -> fetch buffer
       const needBuffer = !width || !height || !cloudinaryResult.format;
       if (needBuffer) {
         buffer = await this.fetchBufferWithRetry(cloudinaryResult.secureUrl, 20 * 1024 * 1024);
@@ -309,7 +277,6 @@ class EnhancedProcessingTracker {
         }
       }
 
-      // Try to generate thumbnail URL using Cloudinary transformation
       try {
         thumbnailUrl = generateThumbnailUrl(cloudinaryResult.publicId, {
           width: 200,
@@ -323,7 +290,6 @@ class EnhancedProcessingTracker {
           error: thumbnailError.message
         });
         
-        // Fallback: generate local thumbnail if we have buffer
         if (buffer) {
           try {
             const thumbBuffer = await sharp(buffer).resize(200, 200, { fit: 'cover' }).toBuffer();
@@ -351,7 +317,6 @@ class EnhancedProcessingTracker {
         publicId: cloudinaryResult?.publicId
       });
 
-      // Determine if error is retryable
       if (error.message.includes('timeout') || error.message.includes('network')) {
         throw new RetryableError(`Image processing failed: ${error.message}`);
       }
@@ -384,7 +349,6 @@ class EnhancedProcessingTracker {
 
       const buffer = await this.fetchBufferWithRetry(cloudinaryResult.secureUrl, MAX_PDF_BYTES);
 
-      // Validate file is PDF
       const valid = await this.validateBufferType(buffer, 'application/pdf');
       if (!valid) {
         throw new PermanentError('Buffer is not a valid PDF');
@@ -407,7 +371,6 @@ class EnhancedProcessingTracker {
         publicId: cloudinaryResult?.publicId
       });
 
-      // Determine if error is retryable
       if (error.message.includes('timeout') || error.message.includes('network') || 
           error.message.includes('corrupted') || error.message.includes('invalid')) {
         if (error.message.includes('corrupted') || error.message.includes('invalid')) {
@@ -456,7 +419,6 @@ class EnhancedProcessingTracker {
           columnCount = columns.length;
           headerProcessed = true;
           
-          // Check for potentially sensitive columns
           const sensitivePatterns = ['password', 'ssn', 'social', 'credit', 'card', 'phone', 'email'];
           hasSensitiveData = columns.some(col => 
             sensitivePatterns.some(pattern => 
@@ -472,7 +434,6 @@ class EnhancedProcessingTracker {
             sampleRows.push(row);
           }
 
-          // Progress reporting
           if (rowCount % STREAM_CSV_ROW_PROGRESS_INTERVAL === 0) {
             logger.debug('CSV processing progress', {
               publicId: cloudinaryResult.publicId,
@@ -644,34 +605,6 @@ class EnhancedProcessingTracker {
       }
     }
     return job;
-  }
-
-  getAllJobs() {
-    return Array.from(this.jobs.values()).map(job => {
-      const queueJob = this.queue.getJob(job.jobId);
-      if (queueJob) {
-        return {
-          ...job,
-          status: queueJob.status,
-          progress: queueJob.progress,
-          attempts: queueJob.attempts,
-          errors: queueJob.errors
-        };
-      }
-      return job;
-    });
-  }
-
-  cancelJob(fileId) {
-    const job = this.jobs.get(fileId);
-    if (job && job.jobId) {
-      return this.queue.cancelJob(job.jobId);
-    }
-    throw new Error('Job not found');
-  }
-
-  getQueueStats() {
-    return this.queue.getStats();
   }
 
   cleanupOldJobs() {

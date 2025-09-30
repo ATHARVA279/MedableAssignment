@@ -246,12 +246,12 @@ class FileService {
     }
   }
 
-  async deleteFile(fileId) {
+  async deleteFile(fileId, deletedCloudinaryPublicId = null) {
     try {
       const file = await this.getFileById(fileId);
-      await file.softDelete();
+      await file.softDelete(deletedCloudinaryPublicId);
 
-      logger.info("File soft deleted", { fileId });
+      logger.info("File soft deleted", { fileId, deletedCloudinaryPublicId });
 
       return file;
     } catch (error) {
@@ -265,6 +265,59 @@ class FileService {
       });
 
       throw new AppError(`Failed to delete file: ${error.message}`, 500);
+    }
+  }
+
+  async restoreFile(fileId) {
+    try {
+      const file = await this.getFileById(fileId);
+      
+      if (file.status !== 'deleted') {
+        throw new AppError('File is not in deleted status', 400);
+      }
+
+      if (!file.deletedCloudinaryPublicId) {
+        throw new AppError('No deleted Cloudinary reference found for restoration', 400);
+      }
+
+      const { restoreFile } = require('../utils/fileStorage');
+      
+      const restoreResult = await restoreFile(
+        file.deletedCloudinaryPublicId, 
+        file.cloudinaryPublicId,
+        this.getResourceType(file.mimetype)
+      );
+
+      await file.restore(file.cloudinaryPublicId);
+
+      logger.info("File restored successfully", { 
+        fileId, 
+        originalPublicId: file.cloudinaryPublicId,
+        deletedPublicId: file.deletedCloudinaryPublicId 
+      });
+
+      return file;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error("Failed to restore file", {
+        fileId,
+        error: error.message,
+      });
+
+      throw new AppError(`Failed to restore file: ${error.message}`, 500);
+    }
+  }
+
+  getResourceType(mimetype) {
+    if (mimetype.startsWith("image/")) {
+      return "image";
+    } else if (mimetype.startsWith("video/")) {
+      return "video";
+    } else {
+      return "raw";
     }
   }
 
@@ -338,71 +391,6 @@ class FileService {
       });
 
       throw new AppError(`Failed to search files: ${error.message}`, 500);
-    }
-  }
-
-  async getFileStats(uploaderId = null) {
-    try {
-      const matchStage = uploaderId
-        ? { uploaderId, status: { $ne: "deleted" } }
-        : { status: { $ne: "deleted" } };
-
-      const stats = await File.aggregate([
-        { $match: matchStage },
-        {
-          $group: {
-            _id: null,
-            totalFiles: { $sum: 1 },
-            totalSize: { $sum: "$size" },
-            avgSize: { $avg: "$size" },
-            totalDownloads: { $sum: "$downloadCount" },
-            statusBreakdown: {
-              $push: "$status",
-            },
-            mimetypeBreakdown: {
-              $push: "$mimetype",
-            },
-          },
-        },
-      ]);
-
-      if (stats.length === 0) {
-        return {
-          totalFiles: 0,
-          totalSize: 0,
-          avgSize: 0,
-          totalDownloads: 0,
-          statusBreakdown: {},
-          mimetypeBreakdown: {},
-        };
-      }
-
-      const result = stats[0];
-
-      result.statusBreakdown = result.statusBreakdown.reduce((acc, status) => {
-        acc[status] = (acc[status] || 0) + 1;
-        return acc;
-      }, {});
-
-      result.mimetypeBreakdown = result.mimetypeBreakdown.reduce(
-        (acc, mimetype) => {
-          acc[mimetype] = (acc[mimetype] || 0) + 1;
-          return acc;
-        },
-        {}
-      );
-
-      return result;
-    } catch (error) {
-      logger.error("Failed to get file statistics", {
-        uploaderId,
-        error: error.message,
-      });
-
-      throw new AppError(
-        `Failed to get file statistics: ${error.message}`,
-        500
-      );
     }
   }
 

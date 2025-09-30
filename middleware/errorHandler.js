@@ -118,24 +118,12 @@ const commonErrors = {
   storageFailed: (message = 'Storage operation failed') => new RetryableError(message, 500, 3)
 };
 
-function asyncHandlerWithRetry(fn, retryConfig = {}) {
-  return (req, res, next) => {
-    Promise.resolve(fn(req, res, next)).catch(error => {
-      if (!error.retryConfig && retryConfig) {
-        error.retryConfig = retryConfig;
-      }
-      next(error);
-    });
-  };
-}
-
 module.exports = {
   AppError,
   RetryableError,
   PermanentError,
   errorHandler,
   asyncHandler,
-  asyncHandlerWithRetry,
   logError,
   sanitizeError,
   commonErrors

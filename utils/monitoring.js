@@ -126,27 +126,7 @@ const performanceMonitor = (req, res, next) => {
 
 const healthMonitor = new HealthMonitor();
 
-const gracefulShutdown = (signal) => {
-  logger.info(`Received ${signal}, starting graceful shutdown`);
-  
-  process.exit(0);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught exception', { error: error.message, stack: error.stack });
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled promise rejection', { reason, promise });
-  process.exit(1);
-});
-
 module.exports = {
   healthMonitor,
   performanceMonitor,
-  gracefulShutdown
 };

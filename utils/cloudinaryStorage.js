@@ -86,7 +86,6 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
 
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
-    const fileExtension = originalName.split('.').pop();
     const publicId = `file-processing/${timestamp}-${randomString}`;
 
     const uploadOptions = {
@@ -215,22 +214,80 @@ async function uploadToCloudinary(fileBuffer, originalName, mimetype, options = 
 
 async function deleteFromCloudinary(publicId, resourceType = 'auto') {
   try {
+    const deletedPublicId = `deleted/${Date.now()}_${publicId.replace(/\//g, '_')}`;
+    
+    const result = await cloudinary.uploader.rename(publicId, deletedPublicId, {
+      resource_type: resourceType,
+      overwrite: true
+    });
+
+    logger.info('File moved to deleted folder in Cloudinary', {
+      originalPublicId: publicId,
+      deletedPublicId: deletedPublicId,
+      resourceType
+    });
+
+    return {
+      result: 'moved_to_deleted',
+      deletedPublicId: deletedPublicId,
+      originalPublicId: publicId
+    };
+  } catch (error) {
+    logger.error('Cloudinary soft deletion failed', {
+      error: error.message,
+      publicId,
+      resourceType
+    });
+    throw new Error(`Failed to soft delete file from Cloudinary: ${error.message}`);
+  }
+}
+
+async function permanentDeleteFromCloudinary(publicId, resourceType = 'auto') {
+  try {
     const result = await cloudinary.uploader.destroy(publicId, {
       resource_type: resourceType
     });
 
-    logger.info('File deleted from Cloudinary', {
+    logger.info('File permanently deleted from Cloudinary', {
       publicId,
       result: result.result
     });
 
     return result.result === 'ok';
   } catch (error) {
-    logger.error('Cloudinary deletion failed', {
+    logger.error('Cloudinary permanent deletion failed', {
       error: error.message,
       publicId
     });
-    throw new Error(`Failed to delete file from Cloudinary: ${error.message}`);
+    throw new Error(`Failed to permanently delete file from Cloudinary: ${error.message}`);
+  }
+}
+
+async function restoreFromDeleted(deletedPublicId, originalPublicId, resourceType = 'auto') {
+  try {
+    const result = await cloudinary.uploader.rename(deletedPublicId, originalPublicId, {
+      resource_type: resourceType,
+      overwrite: false
+    });
+
+    logger.info('File restored from deleted folder in Cloudinary', {
+      deletedPublicId,
+      restoredPublicId: originalPublicId,
+      resourceType
+    });
+
+    return {
+      result: 'restored',
+      restoredPublicId: originalPublicId,
+      deletedPublicId: deletedPublicId
+    };
+  } catch (error) {
+    logger.error('Cloudinary file restoration failed', {
+      error: error.message,
+      deletedPublicId,
+      originalPublicId
+    });
+    throw new Error(`Failed to restore file from Cloudinary: ${error.message}`);
   }
 }
 
@@ -248,23 +305,6 @@ function generateThumbnailUrl(publicId, options = {}) {
   return cloudinary.url(publicId, {
     resource_type: 'image',
     transformation: [transformOptions]
-  });
-}
-
-function generateOptimizedUrl(publicId, resourceType = 'auto', options = {}) {
-  const baseOptions = {
-    secure: true,
-    ...options
-  };
-
-  if (resourceType === 'image') {
-    baseOptions.quality = baseOptions.quality || 'auto';
-    baseOptions.fetch_format = baseOptions.fetch_format || 'auto';
-  }
-
-  return cloudinary.url(publicId, {
-    resource_type: resourceType,
-    ...baseOptions
   });
 }
 
@@ -363,8 +403,9 @@ async function testCloudinaryConnection() {
 module.exports = {
   uploadToCloudinary,
   deleteFromCloudinary,
+  permanentDeleteFromCloudinary,
+  restoreFromDeleted,
   generateThumbnailUrl,
-  generateOptimizedUrl,
   generateDownloadUrl,
   extractPublicIdFromUrl,
   getFileMetadata,

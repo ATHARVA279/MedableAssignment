@@ -159,6 +159,16 @@ const fileSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    deletedCloudinaryPublicId: {
+      type: String,
+      default: null,
+    },
+
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -315,8 +325,22 @@ fileSchema.methods.updateProcessingStatus = function (status, result = null) {
   return this.save();
 };
 
-fileSchema.methods.softDelete = function () {
+fileSchema.methods.softDelete = function (deletedCloudinaryPublicId = null) {
   this.status = "deleted";
+  this.deletedAt = new Date();
+  if (deletedCloudinaryPublicId) {
+    this.deletedCloudinaryPublicId = deletedCloudinaryPublicId;
+  }
+  return this.save();
+};
+
+fileSchema.methods.restore = function (restoredCloudinaryPublicId = null) {
+  this.status = "processed"; // or whatever the previous status was
+  this.deletedAt = null;
+  if (restoredCloudinaryPublicId) {
+    this.cloudinaryPublicId = restoredCloudinaryPublicId;
+  }
+  this.deletedCloudinaryPublicId = null;
   return this.save();
 };
 

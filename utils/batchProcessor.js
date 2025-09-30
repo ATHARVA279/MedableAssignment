@@ -2,9 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const { logger } = require('./logger');
 const { saveFile } = require('./fileStorage');
 const { validateFile } = require('../middleware/fileValidation');
-const { processFile, enhancedProcessingTracker } = require('./enhancedFileProcessor');
-const { retryOperations } = require('./retryManager');
-const { queueManager, JOB_TYPES, JOB_PRIORITIES } = require('./jobQueue');
+const { processFile } = require('./enhancedFileProcessor');
 
 const batchJobs = new Map();
 
@@ -263,27 +261,6 @@ function getBatchJob(batchId, userId, userRole) {
   };
 }
 
-function getUserBatchJobs(userId, userRole) {
-  const userJobs = [];
-  
-  for (const [batchId, batchJob] of batchJobs.entries()) {
-    if (batchJob.userId === userId || userRole === 'admin') {
-      userJobs.push({
-        batchId: batchJob.batchId,
-        description: batchJob.description,
-        status: batchJob.status,
-        createdAt: batchJob.createdAt,
-        totalFiles: batchJob.totalFiles,
-        successfulFiles: batchJob.successfulFiles,
-        failedFiles: batchJob.failedFiles,
-        progress: batchJob.progress
-      });
-    }
-  }
-  
-  return userJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-}
-
 function cancelBatchJob(batchId, userId, userRole) {
   const batchJob = batchJobs.get(batchId);
   
@@ -310,27 +287,6 @@ function cancelBatchJob(batchId, userId, userRole) {
   });
   
   return batchJob;
-}
-
-function deleteBatchJob(batchId, userId, userRole) {
-  const batchJob = batchJobs.get(batchId);
-  
-  if (!batchJob) {
-    throw new Error('Batch job not found');
-  }
-  
-  if (batchJob.userId !== userId && userRole !== 'admin') {
-    throw new Error('Access denied');
-  }
-  
-  batchJobs.delete(batchId);
-  
-  logger.info('Batch job deleted', {
-    batchId,
-    userId
-  });
-  
-  return true;
 }
 
 class Semaphore {
@@ -361,46 +317,9 @@ class Semaphore {
   }
 }
 
-function getBatchStats(userId, userRole) {
-  let totalJobs = 0;
-  let completedJobs = 0;
-  let failedJobs = 0;
-  let totalFiles = 0;
-  let successfulFiles = 0;
-  let failedFiles = 0;
-  
-  for (const [batchId, batchJob] of batchJobs.entries()) {
-    if (batchJob.userId === userId || userRole === 'admin') {
-      totalJobs++;
-      totalFiles += batchJob.totalFiles;
-      successfulFiles += batchJob.successfulFiles;
-      failedFiles += batchJob.failedFiles;
-      
-      if (batchJob.status === 'completed') {
-        completedJobs++;
-      } else if (batchJob.status === 'failed') {
-        failedJobs++;
-      }
-    }
-  }
-  
-  return {
-    totalJobs,
-    completedJobs,
-    failedJobs,
-    totalFiles,
-    successfulFiles,
-    failedFiles,
-    successRate: totalFiles > 0 ? Math.round((successfulFiles / totalFiles) * 100) : 0
-  };
-}
-
 module.exports = {
   createBatchJob,
   startBatchProcessing,
   getBatchJob,
-  getUserBatchJobs,
-  cancelBatchJob,
-  deleteBatchJob,
-  getBatchStats
+  cancelBatchJob
 };

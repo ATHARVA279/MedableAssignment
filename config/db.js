@@ -24,11 +24,6 @@ class DatabaseConnection {
       this.isConnected = true;
       this.connectionAttempts = 0;
       
-      logger.info('MongoDB connected successfully', {
-        uri: mongoUri.replace(/\/\/.*@/, '//***:***@'),
-        database: mongoose.connection.db.databaseName
-      });
-      
       console.log('MongoDB connected successfully');
       
       return true;
@@ -106,29 +101,6 @@ class DatabaseConnection {
     }
   }
 }
-
-mongoose.connection.on('connected', () => {
-  logger.info('Mongoose connected to MongoDB');
-});
-
-mongoose.connection.on('error', (error) => {
-  logger.error('Mongoose connection error', { error: error.message });
-});
-
-mongoose.connection.on('disconnected', () => {
-  logger.warn('Mongoose disconnected from MongoDB');
-});
-
-process.on('SIGINT', async () => {
-  try {
-    await mongoose.connection.close();
-    logger.info('Mongoose connection closed through app termination');
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error closing mongoose connection', { error: error.message });
-    process.exit(1);
-  }
-});
 
 const dbConnection = new DatabaseConnection();
 

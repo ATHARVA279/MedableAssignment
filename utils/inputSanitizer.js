@@ -30,16 +30,6 @@ class InputSanitizer {
         /\.\.%2f/gi,
         /\.\.%5c/gi
       ],
-      
-      commandInjection: [
-        /[;&|`$(){}[\]]/g,
-        /\b(cat|ls|pwd|whoami|id|uname|ps|netstat|ifconfig|ping|wget|curl|nc|telnet|ssh|ftp)\b/gi
-      ],
-      
-      ldapInjection: [
-        /[()=*!&|]/g,
-        /\x00/g
-      ]
     };
 
     this.allowedTags = ['b', 'i', 'em', 'strong', 'u', 'br', 'p'];
@@ -93,9 +83,6 @@ class InputSanitizer {
       }
     }
 
-    if (data.metadata && typeof data.metadata === 'object') {
-      sanitized.metadata = this.sanitizeObject(data.metadata);
-    }
 
     return {
       sanitized,
@@ -110,10 +97,7 @@ class InputSanitizer {
     }
 
     let sanitized = filename.replace(/\.\.\//g, '').replace(/\.\.\\/g, '');
-    
     sanitized = sanitized.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-    
-    sanitized = sanitized.replace(/[<>:"|?*]/g, '');
     
     if (sanitized.length > this.maxLengths.fileName) {
       const ext = sanitized.substring(sanitized.lastIndexOf('.'));
@@ -154,10 +138,6 @@ class InputSanitizer {
       sanitized = sanitized.replace(pattern, '');
     });
 
-    this.patterns.commandInjection.forEach(pattern => {
-      sanitized = sanitized.replace(pattern, '');
-    });
-
     this.patterns.pathTraversal.forEach(pattern => {
       sanitized = sanitized.replace(pattern, '');
     });
@@ -170,38 +150,6 @@ class InputSanitizer {
     }
 
     return sanitized;
-  }
-
-  sanitizeHTML(html) {
-    if (!html || typeof html !== 'string') {
-      return '';
-    }
-
-    let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    
-    sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
-    sanitized = sanitized.replace(/\s*javascript\s*:/gi, '');
-    
-    sanitized = sanitized.replace(/\s*style\s*=\s*["'][^"']*["']/gi, '');
-    
-    const allowedTagsPattern = new RegExp(`<(?!\/?(?:${this.allowedTags.join('|')})\s*\/?>)[^>]+>`, 'gi');
-    sanitized = sanitized.replace(allowedTagsPattern, '');
-
-    return sanitized.trim();
-  }
-
-  sanitizeEmail(email) {
-    if (!email || typeof email !== 'string') {
-      return '';
-    }
-
-    const sanitized = email.toLowerCase().trim();
-    
-    if (sanitized.length > this.maxLengths.email) {
-      return '';
-    }
-
-    return validator.isEmail(sanitized) ? sanitized : '';
   }
 
   sanitizeURL(url) {
@@ -220,45 +168,6 @@ class InputSanitizer {
       require_protocol: true 
     })) {
       return '';
-    }
-
-    return sanitized;
-  }
-
-  sanitizeObject(obj, maxDepth = 3, currentDepth = 0) {
-    if (currentDepth >= maxDepth) {
-      return {};
-    }
-
-    const sanitized = {};
-
-    for (const [key, value] of Object.entries(obj)) {
-      const sanitizedKey = this.sanitizeText(key, 50);
-      if (!sanitizedKey) continue;
-
-      if (typeof value === 'string') {
-        sanitized[sanitizedKey] = this.sanitizeText(value);
-      } else if (typeof value === 'number') {
-        if (Number.isFinite(value)) {
-          sanitized[sanitizedKey] = value;
-        }
-      } else if (typeof value === 'boolean') {
-        sanitized[sanitizedKey] = value;
-      } else if (Array.isArray(value)) {
-        sanitized[sanitizedKey] = value
-          .slice(0, 100) 
-          .map(item => {
-            if (typeof item === 'string') {
-              return this.sanitizeText(item);
-            } else if (typeof item === 'object' && item !== null) {
-              return this.sanitizeObject(item, maxDepth, currentDepth + 1);
-            }
-            return item;
-          })
-          .filter(item => item !== null && item !== undefined);
-      } else if (typeof value === 'object' && value !== null) {
-        sanitized[sanitizedKey] = this.sanitizeObject(value, maxDepth, currentDepth + 1);
-      }
     }
 
     return sanitized;
@@ -337,84 +246,12 @@ class InputSanitizer {
     };
   }
 
-  sanitizeSearchQuery(query) {
-    if (!query || typeof query !== 'string') {
-      return '';
-    }
-
-    let sanitized = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-    this.patterns.sqlInjection.forEach(pattern => {
-      sanitized = sanitized.replace(pattern, '');
-    });
-
-    sanitized = sanitized.trim().substring(0, 100);
-
-    return sanitized;
-  }
-
   sanitizeRateLimitKey(key) {
     if (!key || typeof key !== 'string') {
       return 'unknown';
     }
 
     return key.replace(/[^a-zA-Z0-9._-]/g, '').substring(0, 50) || 'sanitized';
-  }
-
-  logSanitization(type, original, sanitized, context = {}) {
-    if (original !== sanitized) {
-      logger.warn('Input sanitized', {
-        type,
-        originalLength: original?.length || 0,
-        sanitizedLength: sanitized?.length || 0,
-        context,
-        timestamp: new Date().toISOString()
-      });
-    }
-  }
-
-  sanitizeBatch(inputs) {
-    const results = {};
-    const errors = [];
-
-    for (const [key, value] of Object.entries(inputs)) {
-      try {
-        if (key === 'email') {
-          results[key] = this.sanitizeEmail(value);
-        } else if (key === 'url') {
-          results[key] = this.sanitizeURL(value);
-        } else if (key === 'filename') {
-          results[key] = this.sanitizeFileName(value);
-        } else if (key === 'html') {
-          results[key] = this.sanitizeHTML(value);
-        } else if (typeof value === 'object') {
-          results[key] = this.sanitizeObject(value);
-        } else {
-          results[key] = this.sanitizeText(String(value));
-        }
-      } catch (error) {
-        errors.push(`Failed to sanitize ${key}: ${error.message}`);
-        results[key] = '';
-      }
-    }
-
-    return {
-      sanitized: results,
-      errors,
-      isValid: errors.length === 0
-    };
-  }
-
-  getStats() {
-    return {
-      patterns: Object.keys(this.patterns).reduce((acc, key) => {
-        acc[key] = this.patterns[key].length;
-        return acc;
-      }, {}),
-      maxLengths: this.maxLengths,
-      allowedTags: this.allowedTags,
-      timestamp: new Date().toISOString()
-    };
   }
 }
 

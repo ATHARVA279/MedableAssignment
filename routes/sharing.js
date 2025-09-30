@@ -2,7 +2,6 @@ const express = require("express");
 const crypto = require("crypto");
 const { authenticateToken } = require("../middleware/auth");
 const {
-  AppError,
   asyncHandler,
   commonErrors,
 } = require("../middleware/errorHandler");
@@ -278,101 +277,6 @@ router.get(
   })
 );
 
-router.get(
-  "/preview/:token",
-  asyncHandler(async (req, res) => {
-    const { token } = req.params;
-    const { password } = req.query;
-
-    const shareData = shareLinks.get(token);
-
-    if (!shareData) {
-      throw commonErrors.notFound("Share link");
-    }
-
-    if (isExpired(shareData)) {
-      shareLinks.delete(token);
-      throw commonErrors.notFound("Share link has expired");
-    }
-
-    if (!shareData.isActive) {
-      throw commonErrors.forbidden("Share link has been deactivated");
-    }
-
-    if (!shareData.allowPreview) {
-      throw commonErrors.forbidden("Preview not allowed for this share link");
-    }
-
-    if (shareData.password) {
-      if (!password) {
-        return res.status(401).json({
-          error: "Password required",
-          requiresPassword: true,
-        });
-      }
-
-      const hashedPassword = crypto
-        .createHash("sha256")
-        .update(password)
-        .digest("hex");
-      if (hashedPassword !== shareData.password) {
-        throw commonErrors.unauthorized("Invalid password");
-      }
-    }
-
-    res.json({
-      message: "File preview authorized",
-      fileId: shareData.fileId,
-      previewUrl: `/api/upload/${shareData.fileId}/preview`,
-      allowDownload: true,
-    });
-  })
-);
-
-router.get(
-  "/",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const userShares = [];
-
-    for (const [token, shareData] of shareLinks.entries()) {
-      if (shareData.createdBy === req.user.userId) {
-        userShares.push({
-          token,
-          fileId: shareData.fileId,
-          fileName: shareData.fileName || "Unknown File",
-          fileSize: shareData.fileSize || 0,
-          mimetype: shareData.mimetype || "application/octet-stream",
-          createdAt: new Date(shareData.createdAt).toISOString(),
-          expiresAt: new Date(shareData.expiresAt).toISOString(),
-          expiresIn: shareData.expiresIn,
-          downloadCount: shareData.downloadCount,
-          maxDownloads: shareData.maxDownloads,
-          allowPreview: shareData.allowPreview,
-          hasPassword: !!shareData.password,
-          isActive: shareData.isActive,
-          isExpired: isExpired(shareData),
-          url: `${req.protocol}://${req.get(
-            "host"
-          )}/api/sharing/download/${token}`,
-          directUrl: shareData.directDownloadUrl || shareData.cloudinaryUrl,
-          originalUrl: shareData.cloudinaryUrl,
-        });
-      }
-    }
-
-    userShares.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-    res.json({
-      shareLinks: userShares,
-      shares: userShares,
-      total: userShares.length,
-      active: userShares.filter((s) => s.isActive && !s.isExpired).length,
-      expired: userShares.filter((s) => s.isExpired).length,
-    });
-  })
-);
-
 router.put(
   "/:token",
   authenticateToken,
@@ -435,54 +339,6 @@ router.delete(
     res.json({
       message: "Share link deleted successfully",
     });
-  })
-);
-
-
-router.get(
-  "/test-url/:fileId",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { fileId } = req.params;
-    const { fileService } = require("../services/fileService");
-    const {
-      generateDownloadUrl,
-      extractPublicIdFromUrl,
-    } = require("../utils/cloudinaryStorage");
-
-    try {
-      const file = await fileService.getFileById(fileId);
-
-      if (file.uploaderId !== req.user.userId) {
-        throw commonErrors.forbidden("You can only test your own files");
-      }
-
-      const publicId = extractPublicIdFromUrl(file.secureUrl);
-      const downloadUrl = generateDownloadUrl(
-        publicId,
-        "raw",
-        file.originalName
-      );
-
-      res.json({
-        fileId: file.fileId,
-        fileName: file.originalName,
-        mimetype: file.mimetype,
-        originalUrl: file.secureUrl,
-        extractedPublicId: publicId,
-        generatedDownloadUrl: downloadUrl,
-        urlComparison: {
-          hasAttachmentFlag: downloadUrl.includes("fl_attachment"),
-          isSecure: downloadUrl.startsWith("https://"),
-          domain: downloadUrl.split("/")[2],
-        },
-      });
-    } catch (error) {
-      res.status(500).json({
-        error: error.message,
-        fileId,
-      });
-    }
   })
 );
 

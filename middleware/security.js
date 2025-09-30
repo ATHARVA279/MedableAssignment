@@ -23,35 +23,6 @@ const securityHeaders = helmet({
   },
 });
 
-const sanitizeRequest = (req, res, next) => {
-  for (const key in req.query) {
-    if (typeof req.query[key] === "string") {
-      req.query[key] = req.query[key].replace(/[<>\"']/g, "");
-    }
-  }
-
-  if (!req.path.includes("/upload") && req.body) {
-    const bodyStr = JSON.stringify(req.body);
-    if (bodyStr.length > 10000) {
-      return res.status(413).json({ error: "Request body too large" });
-    }
-  }
-
-  next();
-};
-
-const ipWhitelist = (allowedIPs = []) => {
-  return (req, res, next) => {
-    if (config.server.isProduction && allowedIPs.length > 0) {
-      const clientIP = req.ip || req.connection.remoteAddress;
-      if (!allowedIPs.includes(clientIP)) {
-        return res.status(403).json({ error: "Access denied from this IP" });
-      }
-    }
-    next();
-  };
-};
-
 const requestLogger = (req, res, next) => {
   const start = Date.now();
 
@@ -82,7 +53,5 @@ const requestLogger = (req, res, next) => {
 
 module.exports = {
   securityHeaders,
-  sanitizeRequest,
-  ipWhitelist,
   requestLogger,
 };

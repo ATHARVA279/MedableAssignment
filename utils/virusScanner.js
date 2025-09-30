@@ -1,20 +1,8 @@
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const fs = require('fs').promises;
-const path = require('path');
 const crypto = require('crypto');
 const { logger } = require('./logger');
 const config = require('../config');
 
-const execAsync = promisify(exec);
-
 class VirusScanner {
-  constructor() {
-    this.scanners = {
-      virustotal: this.scanWithVirusTotal.bind(this)
-    };
-  }
-
   async scanFile(fileBuffer, fileName, options = {}) {
     const scanId = crypto.randomUUID();
     const startTime = Date.now();
@@ -22,21 +10,14 @@ class VirusScanner {
     logger.info('Starting virus scan', { scanId, fileName, size: fileBuffer.length });
 
     try {
-      const scannerType = options.scanner || this.getAvailableScanner();
-      const scanner = this.scanners[scannerType];
-      
-      if (!scanner) {
-        throw new Error(`Unknown scanner type: ${scannerType}`);
-      }
-
-      const result = await scanner(fileBuffer, fileName, { scanId, ...options });
+      const result = await this.scanWithVirusTotal(fileBuffer, fileName, { scanId, ...options });
       
       const duration = Date.now() - startTime;
       
       logger.info('Virus scan completed', {
         scanId,
         fileName,
-        scanner: scannerType,
+        scanner: 'virustotal',
         duration,
         clean: result.clean,
         threats: result.threats?.length || 0
@@ -46,7 +27,7 @@ class VirusScanner {
         scanId,
         clean: result.clean,
         threats: result.threats || [],
-        scanner: scannerType,
+        scanner: 'virustotal',
         duration,
         timestamp: new Date().toISOString(),
         metadata: result.metadata || {}
@@ -227,18 +208,6 @@ class VirusScanner {
     };
   }
 
-  getAvailableScanner() {
-    const apiKey = config.security.virusTotalApiKey || process.env.VIRUSTOTAL_API_KEY;
-    
-    if (apiKey) {
-      logger.info('VirusTotal scanner available', { hasApiKey: true });
-      return 'virustotal';
-    } else {
-      logger.error('No VirusTotal API key found, virus scanning will fail');
-      throw new Error('VirusTotal API key not configured');
-    }
-  }
-
   async scanMultipleFiles(files, options = {}) {
     const results = [];
     const concurrency = options.concurrency || 3;
@@ -265,22 +234,6 @@ class VirusScanner {
     }
     
     return results;
-  }
-
-  async getHealthStatus() {
-    const status = {
-      timestamp: new Date().toISOString(),
-      scanners: {}
-    };
-
-    const vtApiKey = config.security.virusTotalApiKey || process.env.VIRUSTOTAL_API_KEY;
-    status.scanners.virustotal = {
-      available: !!vtApiKey,
-      status: vtApiKey ? 'configured' : 'no_api_key',
-      apiKeySource: config.security.virusTotalApiKey ? 'config' : process.env.VIRUSTOTAL_API_KEY ? 'environment' : 'not_found'
-    };
-
-    return status;
   }
 }
 

@@ -6,10 +6,7 @@ const {
   createBatchJob,
   startBatchProcessing,
   getBatchJob,
-  getUserBatchJobs,
   cancelBatchJob,
-  deleteBatchJob,
-  getBatchStats,
 } = require("../utils/batchProcessor");
 
 const router = express.Router();
@@ -88,35 +85,6 @@ router.get(
   })
 );
 
-router.get(
-  "/",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { status, limit = "20", offset = "0" } = req.query;
-
-    let batchJobs = getUserBatchJobs(req.user.userId, req.user.role);
-
-    if (status) {
-      batchJobs = batchJobs.filter((job) => job.status === status);
-    }
-
-    const limitNum = parseInt(limit) || 20;
-    const offsetNum = parseInt(offset) || 0;
-    const total = batchJobs.length;
-    const paginatedJobs = batchJobs.slice(offsetNum, offsetNum + limitNum);
-
-    res.json({
-      batchJobs: paginatedJobs,
-      pagination: {
-        total,
-        limit: limitNum,
-        offset: offsetNum,
-        hasMore: offsetNum + limitNum < total,
-      },
-    });
-  })
-);
-
 router.post(
   "/:batchId/cancel",
   authenticateToken,
@@ -134,105 +102,6 @@ router.post(
         totalFiles: batchJob.totalFiles,
         completedAt: batchJob.completedAt,
       },
-    });
-  })
-);
-
-router.delete(
-  "/:batchId",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { batchId } = req.params;
-
-    deleteBatchJob(batchId, req.user.userId, req.user.role);
-
-    res.json({
-      message: "Batch job deleted successfully",
-      batchId,
-    });
-  })
-);
-
-router.get(
-  "/stats",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const stats = getBatchStats(req.user.userId, req.user.role);
-
-    res.json({
-      stats,
-    });
-  })
-);
-
-router.post(
-  "/create",
-  authenticateToken,
-  upload.array("files", 10),
-  asyncHandler(async (req, res) => {
-    if (!req.files || req.files.length === 0) {
-      throw commonErrors.badRequest("No files provided");
-    }
-
-    const {
-      description = "",
-      processInParallel = "true",
-      maxConcurrency = "3",
-      notifyOnComplete = "false",
-    } = req.body;
-
-    const options = {
-      description,
-      processInParallel: processInParallel === "true",
-      maxConcurrency: parseInt(maxConcurrency) || 3,
-      notifyOnComplete: notifyOnComplete === "true",
-    };
-
-    const batchJob = await createBatchJob(req.files, req.user.userId, options);
-
-    res.status(201).json({
-      message: "Batch job created (not started)",
-      batchJob: {
-        batchId: batchJob.batchId,
-        description: batchJob.description,
-        status: batchJob.status,
-        totalFiles: batchJob.totalFiles,
-        processInParallel: batchJob.processInParallel,
-        maxConcurrency: batchJob.maxConcurrency,
-        createdAt: batchJob.createdAt,
-      },
-    });
-  })
-);
-
-router.post(
-  "/:batchId/start",
-  authenticateToken,
-  asyncHandler(async (req, res) => {
-    const { batchId } = req.params;
-
-    const batchJob = getBatchJob(batchId, req.user.userId, req.user.role);
-
-    if (!batchJob) {
-      throw commonErrors.notFound("Batch job");
-    }
-
-    if (batchJob.status !== "created") {
-      throw commonErrors.badRequest("Batch job already started or completed");
-    }
-
-    setImmediate(async () => {
-      try {
-        await startBatchProcessing(batchId);
-      } catch (error) {
-        console.error("Batch processing failed:", error);
-      }
-    });
-
-    res.json({
-      message: "Batch processing started",
-      batchId,
-      status: "processing",
     });
   })
 );

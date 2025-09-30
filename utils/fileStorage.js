@@ -37,7 +37,7 @@ async function deleteFile(fileIdentifier, resourceType = "auto") {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    logger.error("File deletion failed", {
+    logger.error("File soft deletion failed", {
       error: error.message,
       fileIdentifier,
       storageType: config.storage.type,
@@ -46,16 +46,45 @@ async function deleteFile(fileIdentifier, resourceType = "auto") {
   }
 }
 
-async function fileExists(fileIdentifier, resourceType = "auto") {
+async function permanentDeleteFile(fileIdentifier, resourceType = "auto") {
   try {
     if (config.storage.type === "cloudinary") {
-      await cloudinaryStorage.getFileMetadata(fileIdentifier, resourceType);
-      return true;
+      return await cloudinaryStorage.permanentDeleteFromCloudinary(
+        fileIdentifier,
+        resourceType
+      );
     } else {
       throw new Error(`Unsupported storage type: ${config.storage.type}`);
     }
   } catch (error) {
-    return false;
+    logger.error("File permanent deletion failed", {
+      error: error.message,
+      fileIdentifier,
+      storageType: config.storage.type,
+    });
+    throw error;
+  }
+}
+
+async function restoreFile(deletedFileIdentifier, originalFileIdentifier, resourceType = "auto") {
+  try {
+    if (config.storage.type === "cloudinary") {
+      return await cloudinaryStorage.restoreFromDeleted(
+        deletedFileIdentifier,
+        originalFileIdentifier,
+        resourceType
+      );
+    } else {
+      throw new Error(`Unsupported storage type: ${config.storage.type}`);
+    }
+  } catch (error) {
+    logger.error("File restoration failed", {
+      error: error.message,
+      deletedFileIdentifier,
+      originalFileIdentifier,
+      storageType: config.storage.type,
+    });
+    throw error;
   }
 }
 
@@ -89,72 +118,8 @@ function generateThumbnailUrl(fileIdentifier, options = {}) {
   }
 }
 
-function generateOptimizedUrl(
-  fileIdentifier,
-  resourceType = "auto",
-  options = {}
-) {
-  if (config.storage.type === "cloudinary") {
-    return cloudinaryStorage.generateOptimizedUrl(
-      fileIdentifier,
-      resourceType,
-      options
-    );
-  } else {
-    throw new Error(
-      `URL optimization not supported for storage type: ${config.storage.type}`
-    );
-  }
-}
-
-async function testStorageConnection() {
-  try {
-    if (config.storage.type === "cloudinary") {
-      return await cloudinaryStorage.testCloudinaryConnection();
-    } else {
-      throw new Error(
-        `Storage connection test not implemented for: ${config.storage.type}`
-      );
-    }
-  } catch (error) {
-    logger.error("Storage connection test failed", {
-      error: error.message,
-      storageType: config.storage.type,
-    });
-    return false;
-  }
-}
-
-async function cleanupOldFiles() {
-  try {
-    logger.info("Cleanup operation called", {
-      storageType: config.storage.type,
-    });
-
-    if (config.storage.type === "cloudinary") {
-      logger.info("Cloudinary cleanup: Using Cloudinary auto-cleanup features");
-      return true;
-    } else {
-      logger.warn("Cleanup not implemented for storage type", {
-        storageType: config.storage.type,
-      });
-      return false;
-    }
-  } catch (error) {
-    logger.error("Cleanup operation failed", {
-      error: error.message,
-      storageType: config.storage.type,
-    });
-    return false;
-  }
-}
-
 async function initializeStorage() {
   try {
-    logger.info("Initializing storage system", {
-      storageType: config.storage.type,
-    });
-
     if (config.storage.type === "cloudinary") {
       const isConfigured = cloudinaryStorage.isCloudinaryConfigured();
       if (!isConfigured) {
@@ -183,11 +148,9 @@ async function initializeStorage() {
 module.exports = {
   saveFile,
   deleteFile,
-  fileExists,
+  permanentDeleteFile,
+  restoreFile,
   getFileStats,
   generateThumbnailUrl,
-  generateOptimizedUrl,
-  testStorageConnection,
-  cleanupOldFiles,
   initializeStorage,
 };

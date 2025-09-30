@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'file-upload-secret-2024';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function authenticateToken(req, res, next) {
   const authHeader = req.get('authorization');
@@ -24,7 +24,7 @@ function authenticateToken(req, res, next) {
   }
 }
 
-function optionalAuth(req, res, next) {
+function optionalAuth(req, next) {
   const authHeader = req.get('authorization');
   
   if (authHeader) {

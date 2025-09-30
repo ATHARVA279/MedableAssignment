@@ -1,5 +1,3 @@
-const path = require("path");
-
 require("dotenv").config();
 
 const config = {
@@ -12,7 +10,7 @@ const config = {
   },
 
   security: {
-    jwtSecret: process.env.JWT_SECRET || "file-upload-secret-2024",
+    jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || "24h",
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 10,
     encryptionKey: process.env.ENCRYPTION_KEY || "default-encryption-key",
@@ -52,13 +50,7 @@ const config = {
       apiKey: process.env.CLOUDINARY_API_KEY,
       apiSecret: process.env.CLOUDINARY_API_SECRET,
       secure: true,
-    },
-    aws: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION || "us-east-1",
-      bucket: process.env.AWS_S3_BUCKET,
-    },
+    }
   },
 
   puzzle: {
@@ -78,16 +70,6 @@ const config = {
     level: process.env.LOG_LEVEL || "info",
     file: process.env.LOG_FILE || "./logs/app.log",
     errorFile: process.env.ERROR_LOG_FILE || "./logs/error.log",
-  },
-
-  email: {
-    smtp: {
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    adminEmail: process.env.ADMIN_EMAIL,
   },
 
   monitoring: {
@@ -131,7 +113,6 @@ const config = {
   versioning: {
     enabled: process.env.ENABLE_FILE_VERSIONING !== "false",
     maxVersionsPerFile: parseInt(process.env.MAX_VERSIONS_PER_FILE) || 10,
-    autoCleanupOldVersions: process.env.AUTO_CLEANUP_OLD_VERSIONS === "true",
   },
 
   batchProcessing: {

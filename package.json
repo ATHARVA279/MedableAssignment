@@ -15,7 +15,6 @@
     "backup:create": "node -e \"require('./utils/backupRecovery').backupRecovery.createFullBackup().then(console.log).catch(console.error)\"",
     "backup:list": "node -e \"require('./utils/backupRecovery').backupRecovery.listBackups().then(console.log).catch(console.error)\"",
     "health:check": "curl http://localhost:8888/health",
-    "memory:stats": "node -e \"require('./utils/memoryMonitor').memoryMonitor.generateReport().then ? require('./utils/memoryMonitor').memoryMonitor.generateReport() : console.log(require('./utils/memoryMonitor').memoryMonitor.generateReport())\"",
     "virus:test": "node -e \"require('./utils/virusScanner').virusScanner.getHealthStatus().then(console.log).catch(console.error)\""
   },
   "dependencies": {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { apiClient } from '../services/apiClient'
 import toast from 'react-hot-toast'
 
 const AdminPanel = () => {
@@ -31,8 +30,14 @@ const AdminPanel = () => {
   const loadSystemHealth = async () => {
     updateLoading('health', true)
     try {
-      const response = await apiClient.get('/api/admin/health/detailed')
-      setSystemHealth(response.data)
+      setSystemHealth({
+        timestamp: new Date().toISOString(),
+        overall: 'unavailable',
+        virusScanner: { status: 'unavailable', availableScanners: [] },
+        backup: { status: 'unavailable', totalBackups: 0 },
+        network: { status: 'unavailable', activeSessions: 0 }
+      })
+      toast.info('Admin functionality is currently unavailable')
     } catch (error) {
       toast.error(`Failed to load system health: ${error.response?.data?.error || error.message}`)
     } finally {
@@ -43,72 +48,15 @@ const AdminPanel = () => {
   const loadMemoryStats = async () => {
     updateLoading('memory', true)
     try {
-      const response = await apiClient.get('/api/admin/memory-stats')
-      const { currentStats, report } = response.data || {}
-
-      const transformedStats = []
-
-      if (currentStats) {
-        if (currentStats.system && typeof currentStats.system.percentage === 'number') {
-          transformedStats.push({
-            name: 'System Memory',
-            status: currentStats.system.percentage > 90 ? 'error' :
-              currentStats.system.percentage > 80 ? 'warning' : 'healthy',
-            usage: `${currentStats.system.percentage.toFixed(1)}%`,
-            description: `${formatBytes(currentStats.system.used || 0)} / ${formatBytes(currentStats.system.total || 0)}`
-          })
-        }
-
-        if (currentStats.heap && typeof currentStats.heap.percentage === 'number') {
-          transformedStats.push({
-            name: 'Heap Memory',
-            status: currentStats.heap.percentage > 90 ? 'error' :
-              currentStats.heap.percentage > 80 ? 'warning' : 'healthy',
-            usage: `${currentStats.heap.percentage.toFixed(1)}%`,
-            description: `${formatBytes(currentStats.heap.used || 0)} / ${formatBytes(currentStats.heap.total || 0)}`
-          })
-        }
-
-        if (report?.summary && typeof report.summary.activeUploads === 'number') {
-          transformedStats.push({
-            name: 'Active Uploads',
-            status: report.summary.activeUploads > 10 ? 'warning' : 'healthy',
-            usage: report.summary.activeUploads.toString(),
-            description: `Memory: ${report.summary.totalUploadMemory || '0 Bytes'}`
-          })
-        }
-
-        if (currentStats.limits && currentStats.limits.maxTotalMemoryUsage) {
-          const current = currentStats.current || 0
-          const uploadMemoryPercent = (current / currentStats.limits.maxTotalMemoryUsage) * 100
-          transformedStats.push({
-            name: 'Upload Memory',
-            status: uploadMemoryPercent > 90 ? 'error' :
-              uploadMemoryPercent > 80 ? 'warning' : 'healthy',
-            usage: `${uploadMemoryPercent.toFixed(1)}%`,
-            description: `${formatBytes(current)} / ${formatBytes(currentStats.limits.maxTotalMemoryUsage)}`
-          })
-        }
-      }
-
-      if (transformedStats.length === 0) {
-        transformedStats.push({
-          name: 'Memory Monitor',
-          status: 'warning',
-          usage: 'N/A',
-          description: 'Memory statistics not available'
-        })
-      }
-
-      setMemoryStats(transformedStats)
-    } catch (error) {
-      toast.error(`Failed to load memory stats: ${error.response?.data?.error || error.message}`)
       setMemoryStats([{
         name: 'Memory Monitor',
-        status: 'error',
-        usage: 'Error',
-        description: 'Failed to load memory statistics'
+        status: 'unavailable',
+        usage: 'N/A',
+        description: 'Admin functionality is currently unavailable'
       }])
+      toast.info('Memory statistics are currently unavailable')
+    } catch (error) {
+      toast.error(`Failed to load memory stats: ${error.response?.data?.error || error.message}`)
     } finally {
       updateLoading('memory', false)
     }
@@ -117,8 +65,9 @@ const AdminPanel = () => {
   const loadAccessLogs = async (timeRange = '24h') => {
     updateLoading('logs', true)
     try {
-      const response = await apiClient.get(`/api/admin/access-logs?timeRange=${timeRange}`)
-      setAccessLogs(response.data.statistics || [])
+      // Admin functionality has been removed
+      setAccessLogs([])
+      toast.info('Access logs are currently unavailable')
     } catch (error) {
       toast.error(`Failed to load access logs: ${error.response?.data?.error || error.message}`)
     } finally {
@@ -129,9 +78,7 @@ const AdminPanel = () => {
   const createBackup = async () => {
     updateLoading('backup', true)
     try {
-      await apiClient.post('/api/admin/backup/create')
-      toast.success('Backup created successfully!')
-      loadSystemHealth()
+      toast.info('Backup functionality is currently unavailable')
     } catch (error) {
       toast.error(`Backup failed: ${error.response?.data?.error || error.message}`)
     } finally {
@@ -142,8 +89,7 @@ const AdminPanel = () => {
   const testVirusScanner = async () => {
     updateLoading('virus', true)
     try {
-      await apiClient.post('/api/admin/virus-scanner/test')
-      toast.success('Virus scanner test completed successfully!')
+      toast.info('Virus scanner test is currently unavailable')
     } catch (error) {
       toast.error(`Virus scanner test failed: ${error.response?.data?.error || error.message}`)
     } finally {
@@ -156,6 +102,7 @@ const AdminPanel = () => {
       case 'healthy': return 'badge-green'
       case 'warning': return 'badge-yellow'
       case 'error': return 'badge-red'
+      case 'unavailable': return 'badge-gray'
       default: return 'badge-gray'
     }
   }
@@ -165,13 +112,13 @@ const AdminPanel = () => {
       case 'healthy': return 'fas fa-check-circle'
       case 'warning': return 'fas fa-exclamation-triangle'
       case 'error': return 'fas fa-times-circle'
+      case 'unavailable': return 'fas fa-ban'
       default: return 'fas fa-question-circle'
     }
   }
 
   return (
     <div className="admin-panel">
-      {/* Admin Panel Header */}
       <div className="card">
         <div className="card-header">
           <h1 className="card-title">

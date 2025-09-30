@@ -1,6 +1,7 @@
 const express = require('express');
 const { generateTestToken } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -39,30 +40,11 @@ router.post('/test-token', asyncHandler(async (req, res) => {
   });
 }));
 
-router.get('/me', (req, res) => {
-  const authHeader = req.get('authorization');
-  
-  if (!authHeader) {
-    return res.status(401).json({ error: 'No authorization header provided' });
-  }
-  
-  try {
-    const jwt = require('jsonwebtoken');
-    const { JWT_SECRET } = require('../middleware/auth');
-    
-    const token = authHeader.split(' ')[1];
-    const user = jwt.verify(token, JWT_SECRET);
-    
-    res.json({
-      user,
-      tokenValid: true
-    });
-  } catch (error) {
-    res.status(403).json({ 
-      error: 'Invalid token',
-      tokenValid: false 
-    });
-  }
+router.get('/me', authenticateToken, (req, res) => {
+  res.json({
+    user: req.user,
+    tokenValid: true
+  });
 });
 
 module.exports = router;

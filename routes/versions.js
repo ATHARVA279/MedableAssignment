@@ -7,11 +7,7 @@ const {
   createFileVersion,
   getFileVersions,
   getFileVersion,
-  getLatestVersion,
   deleteFileVersion,
-  restoreFileVersion,
-  compareVersions,
-  getVersionStats
 } = require('../utils/fileVersioning');
 
 const router = express.Router();
@@ -19,7 +15,7 @@ const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024, 
     files: 1
   }
 });
@@ -115,73 +111,6 @@ router.delete('/:fileId/:versionId', authenticateToken, asyncHandler(async (req,
     message: 'Version deleted successfully',
     fileId,
     versionId
-  });
-}));
-
-router.post('/:fileId/:versionId/restore', authenticateToken, asyncHandler(async (req, res) => {
-  const { fileId, versionId } = req.params;
-  
-  const restoredVersion = await restoreFileVersion(fileId, versionId, req.user.userId, req.user.role);
-  
-  res.json({
-    message: 'Version restored successfully',
-    restoredVersion: {
-      versionId: restoredVersion.versionId,
-      versionNumber: restoredVersion.versionNumber,
-      originalName: restoredVersion.originalName,
-      createdAt: restoredVersion.createdAt,
-      secureUrl: restoredVersion.secureUrl
-    }
-  });
-}));
-
-router.get('/:fileId/compare/:version1Id/:version2Id', authenticateToken, asyncHandler(async (req, res) => {
-  const { fileId, version1Id, version2Id } = req.params;
-  
-  const comparison = compareVersions(fileId, version1Id, version2Id, req.user.userId, req.user.role);
-  
-  res.json({
-    fileId,
-    comparison
-  });
-}));
-
-router.get('/:fileId/stats', authenticateToken, asyncHandler(async (req, res) => {
-  const { fileId } = req.params;
-  
-  const stats = getVersionStats(fileId, req.user.userId, req.user.role);
-  
-  if (!stats) {
-    throw commonErrors.notFound('File or versions');
-  }
-  
-  res.json({
-    fileId,
-    stats
-  });
-}));
-
-router.get('/:fileId/latest', authenticateToken, asyncHandler(async (req, res) => {
-  const { fileId } = req.params;
-  
-  const latestVersion = getLatestVersion(fileId, req.user.userId, req.user.role);
-  
-  if (!latestVersion) {
-    throw commonErrors.notFound('Latest version');
-  }
-  
-  res.json({
-    fileId,
-    latestVersion: {
-      versionId: latestVersion.versionId,
-      versionNumber: latestVersion.versionNumber,
-      originalName: latestVersion.originalName,
-      size: latestVersion.size,
-      createdBy: latestVersion.createdBy,
-      createdAt: latestVersion.createdAt,
-      changeDescription: latestVersion.changeDescription,
-      secureUrl: latestVersion.secureUrl
-    }
   });
 }));
 

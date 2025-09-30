@@ -78,11 +78,6 @@ function getFileVersion(fileId, versionId, userId, userRole) {
   return version;
 }
 
-function getLatestVersion(fileId, userId, userRole) {
-  const versions = getFileVersions(fileId, userId, userRole);
-  return versions.length > 0 ? versions[0] : null;
-}
-
 async function deleteFileVersion(fileId, versionId, userId, userRole) {
   try {
     const versions = fileVersions.get(fileId) || [];
@@ -126,79 +121,6 @@ async function deleteFileVersion(fileId, versionId, userId, userRole) {
   }
 }
 
-async function restoreFileVersion(fileId, versionId, userId, userRole) {
-  try {
-    const version = getFileVersion(fileId, versionId, userId, userRole);
-    
-    if (!version) {
-      throw new Error('Version not found or access denied');
-    }
-    
-    const restoredVersion = await createFileVersion(
-      fileId,
-      null,
-      version.originalName,
-      version.mimetype,
-      userId,
-      `Restored from version ${version.versionNumber}`
-    );
-    
-    restoredVersion.publicId = version.publicId;
-    restoredVersion.secureUrl = version.secureUrl;
-    restoredVersion.size = version.size;
-    
-    logger.info('File version restored', {
-      fileId,
-      restoredVersionId: versionId,
-      newVersionId: restoredVersion.versionId,
-      userId
-    });
-    
-    return restoredVersion;
-  } catch (error) {
-    logger.error('Failed to restore file version', {
-      error: error.message,
-      fileId,
-      versionId,
-      userId
-    });
-    throw error;
-  }
-}
-
-function compareVersions(fileId, version1Id, version2Id, userId, userRole) {
-  const version1 = getFileVersion(fileId, version1Id, userId, userRole);
-  const version2 = getFileVersion(fileId, version2Id, userId, userRole);
-  
-  if (!version1 || !version2) {
-    throw new Error('One or both versions not found');
-  }
-  
-  return {
-    version1: {
-      versionId: version1.versionId,
-      versionNumber: version1.versionNumber,
-      createdAt: version1.createdAt,
-      createdBy: version1.createdBy,
-      size: version1.size,
-      changeDescription: version1.changeDescription
-    },
-    version2: {
-      versionId: version2.versionId,
-      versionNumber: version2.versionNumber,
-      createdAt: version2.createdAt,
-      createdBy: version2.createdBy,
-      size: version2.size,
-      changeDescription: version2.changeDescription
-    },
-    differences: {
-      sizeDifference: version2.size - version1.size,
-      timeDifference: new Date(version2.createdAt) - new Date(version1.createdAt),
-      createdByDifferent: version1.createdBy !== version2.createdBy
-    }
-  };
-}
-
 function getNextVersionNumber(fileId) {
   const versions = fileVersions.get(fileId) || [];
   const maxVersion = versions.reduce((max, version) => {
@@ -207,76 +129,9 @@ function getNextVersionNumber(fileId) {
   return maxVersion + 1;
 }
 
-function getResourceType(mimetype) {
-  if (mimetype.startsWith('image/')) return 'image';
-  if (mimetype.startsWith('video/')) return 'video';
-  return 'raw';
-}
-
-function getVersionStats(fileId, userId, userRole) {
-  const versions = getFileVersions(fileId, userId, userRole);
-  
-  if (versions.length === 0) {
-    return null;
-  }
-  
-  const totalSize = versions.reduce((sum, v) => sum + v.size, 0);
-  const contributors = [...new Set(versions.map(v => v.createdBy))];
-  
-  return {
-    totalVersions: versions.length,
-    totalSize,
-    contributors: contributors.length,
-    oldestVersion: versions[versions.length - 1],
-    latestVersion: versions[0],
-    averageSize: Math.round(totalSize / versions.length)
-  };
-}
-
-async function cleanupOldVersions(fileId, keepCount = 10) {
-  try {
-    const versions = fileVersions.get(fileId) || [];
-    const activeVersions = versions.filter(v => v.isActive);
-    
-    if (activeVersions.length <= keepCount) {
-      return 0;
-    }
-    
-    const sortedVersions = activeVersions.sort((a, b) => b.versionNumber - a.versionNumber);
-    const versionsToDelete = sortedVersions.slice(keepCount);
-    
-    let deletedCount = 0;
-    for (const version of versionsToDelete) {
-      version.isActive = false;
-      version.deletedAt = new Date().toISOString();
-      version.deletedBy = 'system';
-      deletedCount++;
-    }
-    
-    logger.info('Old versions cleaned up', {
-      fileId,
-      deletedCount,
-      keepCount
-    });
-    
-    return deletedCount;
-  } catch (error) {
-    logger.error('Failed to cleanup old versions', {
-      error: error.message,
-      fileId
-    });
-    throw error;
-  }
-}
-
 module.exports = {
   createFileVersion,
   getFileVersions,
   getFileVersion,
-  getLatestVersion,
-  deleteFileVersion,
-  restoreFileVersion,
-  compareVersions,
-  getVersionStats,
-  cleanupOldVersions
+  deleteFileVersion
 };

@@ -1,9 +1,6 @@
 const sharp = require('sharp');
 const archiver = require('archiver');
 const { Readable, PassThrough } = require('stream');
-const { promisify } = require('util');
-const { pipeline } = require('stream');
-const streamPipeline = promisify(pipeline);
 const { logger } = require('./logger');
 const { retryOperations } = require('./retryManager');
 const { AppError, RetryableError, PermanentError } = require('../middleware/errorHandler');
@@ -438,27 +435,6 @@ class FileCompressor {
     ];
 
     return supportedTypes.includes(mimetype);
-  }
-
-  static getCompressionSettings(mimetype, fileSize) {
-    const settings = {
-      shouldCompress: this.isCompressionSupported(mimetype),
-      recommendedFormat: mimetype,
-      estimatedRatio: 1
-    };
-
-    if (mimetype.startsWith('image/')) {
-      settings.estimatedRatio = 0.7;
-      settings.minSize = COMPRESSION_CONFIG.image.minSizeForCompression;
-    } else if (mimetype === 'text/csv') {
-      settings.estimatedRatio = 0.3; 
-      settings.minSize = 1024;
-    } else if (mimetype === 'application/pdf') {
-      settings.estimatedRatio = 0.8;
-      settings.minSize = 100 * 1024;
-    }
-
-    return settings;
   }
 }
 
