@@ -27,7 +27,6 @@ const {
   isEncryptionEnabled,
 } = require("../utils/fileEncryption");
 const { createFileVersion } = require("../utils/fileVersioning");
-const { accessLogger } = require("../utils/accessLogger");
 const { memoryMonitor } = require("../utils/memoryMonitor");
 const { networkTimeoutHandler } = require("../utils/networkTimeout");
 const { inputSanitizer } = require("../utils/inputSanitizer");
@@ -133,12 +132,6 @@ router.get(
     const publicOnly = sanitizedQuery.public === "true";
     const search = sanitizedQuery.search;
 
-    await accessLogger.logFileAccess(null, req.user.userId, "list", {
-      ip: req.ip,
-      userAgent: req.get("User-Agent"),
-      query: sanitizedQuery,
-    });
-
     let result;
 
     if (publicOnly) {
@@ -217,30 +210,8 @@ router.get(
       const file = await fileService.getFileById(sanitizedFileId);
 
       if (!canAccessFile(file, req.user)) {
-        await accessLogger.logFileAccess(
-          sanitizedFileId,
-          req.user.userId,
-          "view",
-          {
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-            success: false,
-            error: "Access denied",
-          }
-        );
         throw commonErrors.forbidden("Access denied");
       }
-
-      await accessLogger.logFileAccess(
-        sanitizedFileId,
-        req.user.userId,
-        "view",
-        {
-          ip: req.ip,
-          userAgent: req.get("User-Agent"),
-          success: true,
-        }
-      );
 
       const responseFile = {
         id: file.fileId,
@@ -262,17 +233,7 @@ router.get(
       res.json({ file: responseFile });
     } catch (error) {
       if (error.statusCode === 404) {
-        await accessLogger.logFileAccess(
-          sanitizedFileId,
-          req.user.userId,
-          "view",
-          {
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-            success: false,
-            error: "File not found",
-          }
-        );
+        
       }
       throw error;
     }
@@ -435,19 +396,6 @@ router.post(
     };
 
     const newFile = await fileService.createFile(fileData);
-
-    await accessLogger.logFileAccess(
-      newFile.fileId,
-      req.user.userId,
-      "upload",
-      {
-        ip: req.ip,
-        userAgent: req.get("User-Agent"),
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimetype: file.mimetype,
-      }
-    );
 
     if (createVersion === "true" && parentFileId) {
       try {
@@ -732,35 +680,12 @@ router.get(
       const file = await fileService.getFileById(sanitizedFileId);
 
       if (!canAccessFile(file, req.user)) {
-        await accessLogger.logFileAccess(
-          sanitizedFileId,
-          req.user.userId,
-          "download",
-          {
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-            success: false,
-            error: "Access denied",
-          }
-        );
         throw commonErrors.forbidden(
           "You do not have permission to access this file"
         );
       }
 
       await fileService.incrementDownload(sanitizedFileId);
-
-      await accessLogger.logFileAccess(
-        sanitizedFileId,
-        req.user.userId,
-        "download",
-        {
-          ip: req.ip,
-          userAgent: req.get("User-Agent"),
-          fileName: file.originalName,
-          fileSize: file.size,
-        }
-      );
 
       res.json({
         message: "File download authorized",
@@ -775,17 +700,7 @@ router.get(
       });
     } catch (error) {
       if (error.statusCode === 404) {
-        await accessLogger.logFileAccess(
-          sanitizedFileId,
-          req.user.userId,
-          "download",
-          {
-            ip: req.ip,
-            userAgent: req.get("User-Agent"),
-            success: false,
-            error: "File not found",
-          }
-        );
+
       }
       throw error;
     }

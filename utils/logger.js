@@ -52,34 +52,9 @@ if (config.server.isDevelopment) {
   }));
 }
 
-const securityLogger = winston.createLogger({
-  level: 'info',
-  format: logFormat,
-  defaultMeta: { service: 'security' },
-  transports: [
-    new winston.transports.File({
-      filename: path.join(logsDir, 'security.log'),
-      maxsize: 5242880,
-      maxFiles: 10
-    })
-  ]
-});
-
-const auditLogger = winston.createLogger({
-  level: 'info',
-  format: logFormat,
-  defaultMeta: { service: 'audit' },
-  transports: [
-    new winston.transports.File({
-      filename: path.join(logsDir, 'audit.log'),
-      maxsize: 5242880,
-      maxFiles: 10
-    })
-  ]
-});
 
 const logFileOperation = (operation, fileId, userId, details = {}) => {
-  auditLogger.info('File operation', {
+  logger.info('File operation', {
     operation,
     fileId,
     userId,
@@ -89,7 +64,7 @@ const logFileOperation = (operation, fileId, userId, details = {}) => {
 };
 
 const logSecurityEvent = (event, details = {}) => {
-  securityLogger.warn('Security event', {
+  logger.warn('Security event', {
     event,
     timestamp: new Date().toISOString(),
     ...details
@@ -106,8 +81,6 @@ const logError = (error, context = {}) => {
 
 module.exports = {
   logger,
-  securityLogger,
-  auditLogger,
   logFileOperation,
   logSecurityEvent,
   logError
