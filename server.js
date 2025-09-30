@@ -274,16 +274,10 @@ app.listen(PORT, HOST, () => {
   });
 
   console.log(
-    `📁 Assessment 4: File Processing API running on http://${HOST}:${PORT}`
+    `Assessment 4: File Processing API running on http://${HOST}:${PORT}`
   );
-  console.log(`📋 View instructions: http://${HOST}:${PORT}`);
-  console.log(`🧩 Multi-layered puzzles and file security challenges await!`);
-  console.log(`🔧 Environment: ${config.server.env}`);
-  console.log(`☁️  Storage: ${config.storage.type.toUpperCase()}`);
-
-  if (config.server.isProduction) {
-    console.log("🔒 Production mode: Security features enabled");
-  } else {
-    console.log("🛠️  Development mode: Debug features enabled");
-  }
+  console.log(`View instructions: http://${HOST}:${PORT}`);
+  console.log(`Multi-layered puzzles and file security challenges await!`);
+  console.log(`Environment: ${config.server.env}`);
+  console.log(`Storage: ${config.storage.type.toUpperCase()}`);
 });
