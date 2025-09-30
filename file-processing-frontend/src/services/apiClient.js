@@ -3,7 +3,7 @@ import axios from "axios";
 class ApiClient {
   constructor() {
     this.client = axios.create({
-      baseURL: "https://localhost:8888",
+      baseURL: "https://medableassignment.onrender.com",
       timeout: 30000,
       headers: {
         "Content-Type": "application/json",
