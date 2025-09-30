@@ -59,7 +59,6 @@ const archiveRoutes = require("./routes/archive");
 const sharingRoutes = require("./routes/sharing");
 const versionsRoutes = require("./routes/versions");
 const batchRoutes = require("./routes/batch");
-const quotasRoutes = require("./routes/quotas");
 const virusScanRoutes = require("./routes/virusScan");
 
 const app = express();
@@ -164,7 +163,6 @@ app.use("/api/archive", archiveRoutes);
 app.use("/api/sharing", sharingRoutes);
 app.use("/api/versions", versionsRoutes);
 app.use("/api/batch", batchRoutes);
-app.use("/api/quotas", quotasRoutes);
 app.use("/api/virus-scan", virusScanRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/queue", queueRoutes);

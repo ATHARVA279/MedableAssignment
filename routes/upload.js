@@ -26,12 +26,6 @@ const {
   encryptFileForStorage,
   isEncryptionEnabled,
 } = require("../utils/fileEncryption");
-const {
-  initializeUserQuota,
-  canUserUploadFile,
-  recordFileUpload,
-  recordFileDeletion,
-} = require("../utils/storageQuotas");
 const { createFileVersion } = require("../utils/fileVersioning");
 const { accessLogger } = require("../utils/accessLogger");
 const { memoryMonitor } = require("../utils/memoryMonitor");
@@ -320,20 +314,6 @@ router.post(
     const uploadId = crypto.randomUUID();
     memoryMonitor.registerUpload(uploadId, file.size, file.originalname);
 
-    let quota = require("../utils/storageQuotas").getUserQuota(req.user.userId);
-    if (!quota) {
-      initializeUserQuota(req.user.userId, req.user.role);
-    }
-
-    const quotaCheck = canUserUploadFile(
-      req.user.userId,
-      file.size,
-      file.mimetype
-    );
-    if (!quotaCheck.canUpload) {
-      throw new AppError(`Upload denied: ${quotaCheck.errors.join(", ")}`, 413);
-    }
-
     await validateFile(file);
 
     let fileBuffer = file.buffer;
@@ -456,14 +436,6 @@ router.post(
 
     const newFile = await fileService.createFile(fileData);
 
-    recordFileUpload(
-      req.user.userId,
-      newFile.fileId,
-      file.size,
-      file.mimetype,
-      file.originalname
-    );
-
     await accessLogger.logFileAccess(
       newFile.fileId,
       req.user.userId,
@@ -576,8 +548,6 @@ router.post(
       "X-Storage-Type": "cloudinary",
       "X-Encrypted": !!encryptionMeta ? "true" : "false",
       "X-Compressed": cloudinaryResult.compression ? "true" : "false",
-      "X-Quota-Used": quotaCheck.quotaInfo.storageUsed.toString(),
-      "X-Quota-Remaining": quotaCheck.quotaInfo.storageAvailable.toString(),
       Location: `/api/upload/${newFile.fileId}`,
     });
 
@@ -592,13 +562,6 @@ router.post(
         status: newFile.status,
         publicAccess: newFile.publicAccess,
         secureUrl: newFile.cloudinaryUrl,
-      },
-      quotaInfo: {
-        storageUsed: quotaCheck.quotaInfo.storageUsed,
-        storageLimit: quotaCheck.quotaInfo.storageLimit,
-        storageAvailable: quotaCheck.quotaInfo.storageAvailable,
-        filesUsed: quotaCheck.quotaInfo.filesUsed,
-        filesLimit: quotaCheck.quotaInfo.filesLimit,
       },
       encryption: {
         enabled: isEncryptionEnabled(),
@@ -709,12 +672,6 @@ router.delete(
       } catch (error) {
         console.error("Error deleting file from Cloudinary:", error);
       }
-    }
-
-    try {
-      recordFileDeletion(req.user.userId, fileId, file.size);
-    } catch (quotaError) {
-      console.error("Error updating quota after deletion:", quotaError);
     }
 
     await fileService.deleteFile(fileId);
